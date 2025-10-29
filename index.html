@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>廣告預算核對雙簽表格 (共享歷史紀錄)</title>
+    <title>廣告預算核對雙簽表格 (Google 登入 & 權限控管)</title>
     <!-- 載入 Tailwind CSS CDN for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -35,17 +35,37 @@
             border-radius: 0.375rem; /* rounded-md */
         }
         /* Highlight required fields with a special class */
-        /* 僅針對執行設定（非檢核設定）應用必填星號 */
-        .is-required label::after, .is-required span.text-gray-700::after {
+        .is-required label::after, .is-required span.text-gray-700::after, 
+        .form-group-required label::after {
             content: " *";
             color: #ef4444; /* red-500 */
         }
-        /* 僅針對執行設定（非檢核設定）的必填欄位應用紅色陰影 */
-        .input-group input:required:invalid:not([name*="actual"]):not([name="actualSet"]) {
-             box-shadow: 0 0 0 1px #ef4444;
+        /* Disabled input style */
+        input:disabled, select:disabled, textarea:disabled {
+            background-color: #f9fafb;
+            cursor: not-allowed;
+            opacity: 0.8;
         }
-        .input-group select:required:invalid:not([name*="actual"]):not([name="actualSet"]):not([name="result"]) {
-             box-shadow: 0 0 0 1px #ef4444;
+        /* Admin Panel Modal */
+        #adminPanel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .admin-content {
+            background-color: white;
+            padding: 24px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
@@ -56,29 +76,41 @@
         <!-- 標題區塊 -->
         <header class="p-6 sm:p-8 bg-indigo-600 text-white">
             <h1 class="text-3xl sm:text-4xl font-extrabold mb-1">廣告預算核對雙簽表</h1>
-            <p class="text-indigo-200 text-lg">Campaign Budget Verification Checklist (C-BVC)</p>
-            <p class="mt-3 text-sm italic">此表單用於確保所有預算設定經過兩層次核對，防止超支錯誤。**歷史紀錄為所有用戶共享。**</p>
-            <div id="userIdDisplay" class="mt-2 text-xs text-indigo-200 font-mono break-all">
-                <span id="authStatus"></span>
+            <p class="text-indigo-200 text-lg">Campaign Budget Verification Checklist (C-BVC) - 權限控管版</p>
+            <p class="mt-3 text-sm italic">此表單用於確保所有預算設定經過兩層次核對，防止超支錯誤。</p>
+
+            <div class="mt-4 flex items-center justify-between">
+                <div id="authStatus" class="text-xs font-mono break-all">
+                    <span id="userEmailDisplay">請登入</span>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="adminPanelButton" class="hidden bg-yellow-500 hover:bg-yellow-600 text-gray-900 text-xs font-bold py-1 px-3 rounded-full transition duration-150 shadow-md">
+                        👤 管理員後台
+                    </button>
+                    <button id="authButton" class="bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold py-1 px-3 rounded-full transition duration-150 shadow-md">
+                        登入 Google
+                    </button>
+                </div>
             </div>
-            <!-- Firebase 外部部署提示 -->
-            <div id="externalDeployAlert" class="mt-3 p-2 bg-yellow-400 text-gray-900 rounded-lg text-sm font-semibold hidden">
-                ⚠️ **警告 (GitHub 部署):** Firebase 配置遺失。請在程式碼中替換 `userFirebaseConfig` 變數為您自己的 Firebase 專案金鑰，否則數據將無法儲存。
+            
+            <!-- 載入提示 -->
+            <div id="loadingIndicator" class="mt-3 text-sm font-semibold text-yellow-300 hidden">
+                正在載入中...
             </div>
         </header>
 
         <!-- 表單內容：使用 form 標籤以便於重設 -->
-        <form id="checklistForm">
-            <!-- 基本資訊區塊 (Client Name & Date remain mandatory) -->
+        <form id="checklistForm" class="hidden">
+            <!-- 基本資訊區塊 -->
             <div class="p-6 sm:p-8 border-b border-gray-200">
                 <h2 class="text-xl font-bold text-gray-800 mb-4">基本資料</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-600">
-                    <div class="flex flex-col">
-                        <label class="font-medium text-sm mb-1">客戶名稱 (Client Name) <span class="text-red-500">*</span></label>
+                    <div class="flex flex-col form-group-required">
+                        <label class="font-medium text-sm mb-1">客戶名稱 (Client Name)</label>
                         <input type="text" name="clientName" placeholder="輸入客戶全名" class="p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" required>
                     </div>
-                    <div class="flex flex-col">
-                        <label class="font-medium text-sm mb-1">建立/修改日期 (Date) <span class="text-red-500">*</span></label>
+                    <div class="flex flex-col form-group-required">
+                        <label class="font-medium text-sm mb-1">建立/修改日期 (Date)</label>
                         <input type="date" name="date" class="p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" required>
                     </div>
                 </div>
@@ -93,8 +125,8 @@
                         <tr>
                             <th class="w-1/4">欄位類別 (Category)</th>
                             <th class="w-1/4">設定內容 (Configuration)</th>
-                            <th class="w-1/4">執行設定 (Executor Setting)</th> <!-- 標題變更 -->
-                            <th class="w-1/4">檢核設定 (Reviewer Setting)</th> <!-- 標題變更 -->
+                            <th class="w-1/4">執行設定 (Executor Setting)</th> <!-- Executor only fill -->
+                            <th class="w-1/4">檢核設定 (Reviewer Setting)</th> <!-- Reviewer only fill -->
                         </tr>
                     </thead>
                     <tbody>
@@ -112,6 +144,14 @@
                             </td>
                             <td colspan="2" class="text-gray-500 text-sm">N/A</td>
                         </tr>
+                        <!-- 帳號名稱/帳號ID (New Field Name) -->
+                        <tr>
+                            <td class="font-medium text-gray-700 is-required">帳號名稱/帳號ID</td>
+                            <td>
+                                <input type="text" name="accountNameId" placeholder="輸入帳號名稱/ID" class="w-full p-0.5 border-none bg-transparent focus:ring-0" required>
+                            </td>
+                            <td colspan="2" class="text-gray-500 text-sm">N/A</td>
+                        </tr>
                         <!-- 檢核類型 (Control Field) -->
                         <tr>
                             <td class="font-medium text-gray-700 is-required">檢核類型</td>
@@ -124,44 +164,37 @@
                             </td>
                             <td colspan="2" class="text-gray-500 text-sm">N/A</td>
                         </tr>
-                        <!-- 廣告活動名稱 -->
-                        <tr>
-                            <td class="font-medium text-gray-700">廣告活動名稱</td>
-                            <td>
-                                <input type="text" name="campaignName" placeholder="輸入活動ID或名稱" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                            </td>
-                            <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-                        </tr>
-                        <!-- 原帳戶預算 -->
+                        
+                        <!-- 預算相關欄位 (Account Budget) -->
                         <tr id="row-targetOriginalAccountBudget">
                             <td class="font-medium text-gray-700">原帳戶預算</td>
                             <td>
                                 <label class="block text-xs font-semibold mb-1">預算變動前的值</label>
                             </td>
-                            <td class="input-group">
+                            <td class="input-group executor-field">
                                 <input type="number" name="targetOriginalAccountBudget" placeholder="執行金額" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
                             </td>
-                            <td class="input-group">
+                            <td class="input-group reviewer-field">
                                 <input type="number" name="actualOriginalAccountBudget" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
                             </td>
                         </tr>
-                        <!-- 加值後帳戶預算 -->
                         <tr id="row-targetAccountBudgetAfterTopUp">
                             <td class="font-medium text-gray-700">加值後帳戶預算</td>
                             <td>
                                 <label class="block text-xs font-semibold mb-1">預算變動後的值</label>
                             </td>
-                            <td class="input-group">
+                            <td class="input-group executor-field">
                                 <input type="number" name="targetAccountBudgetAfterTopUp" placeholder="執行金額" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
                             </td>
-                            <td class="input-group">
+                            <td class="input-group reviewer-field">
                                 <input type="number" name="actualAccountBudgetAfterTopUp" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
                             </td>
                         </tr>
-                        <!-- 廣告預算類型 -->
+                        
+                        <!-- 廣告活動預算類型 (Ad Budget) -->
                         <tr id="row-adBudgetType">
                             <td class="font-medium text-gray-700">廣告預算類型</td>
-                            <td class="input-group">
+                            <td class="input-group executor-field">
                                 <select name="adBudgetType" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
                                     <option value="">-- 請選擇 --</option>
                                     <option>日預算 (Daily Budget)</option>
@@ -170,45 +203,47 @@
                             </td>
                             <td colspan="2" class="text-gray-500 text-sm">（選擇類型後請填寫）</td>
                         </tr>
-                        <!-- 預算金額核對 -->
+                        
+                        <!-- 預算金額核對 (Ad Budget) -->
                         <tr id="row-targetAmount" class="bg-yellow-50/50">
                             <td class="font-bold text-indigo-700">廣告活動預算金額 (Budget)</td>
                             <td>
                                 <label class="block text-xs font-semibold mb-1">最終設定的金額</label>
                                 <span class="text-gray-400 text-xs">（以當地貨幣計價）</span>
                             </td>
-                            <td class="input-group">
+                            <td class="input-group executor-field">
                                 <input type="number" name="targetAmount" placeholder="執行數值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-red-600 font-semibold">
                             </td>
-                            <td class="input-group">
+                            <td class="input-group reviewer-field">
                                 <input type="number" name="actualSet" placeholder="檢核設定值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-green-600 font-semibold">
                             </td>
                         </tr>
-                        <!-- 投放期間 - 開始日期 (Start Date) -->
+                        
+                        <!-- 投放期間 - 開始日期 (Ad Budget) -->
                         <tr id="row-targetStartDate1">
                             <td class="font-medium text-gray-700" rowspan="2">投放期間 (Duration)</td>
                             <td>
                                 <label class="block text-xs font-semibold mb-1">開始日期 (Start Date)</label>
                             </td>
-                            <td class="input-group">
+                            <td class="input-group executor-field">
                                 <label class="block text-xs text-gray-500 mb-1">執行設定 (Target)</label>
                                 <input type="date" name="targetStartDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                             </td>
-                            <td class="input-group">
+                            <td class="input-group reviewer-field">
                                 <label class="block text-xs text-gray-500 mb-1">檢核設定 (Actual)</label>
                                 <input type="date" name="actualStartDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                             </td>
                         </tr>
-                        <!-- 投放期間 - 結束日期 (End Date) -->
+                        <!-- 投放期間 - 結束日期 (Ad Budget) -->
                         <tr id="row-targetEndDate2">
                             <td>
                                 <label class="block text-xs font-semibold mb-1">結束日期 (End Date)</label>
                             </td>
-                            <td class="input-group">
+                            <td class="input-group executor-field">
                                 <label class="block text-xs text-gray-500 mb-1">執行設定 (Target)</label>
                                 <input type="date" name="targetEndDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                             </td>
-                            <td class="input-group">
+                            <td class="input-group reviewer-field">
                                 <label class="block text-xs text-gray-500 mb-1">檢核設定 (Actual)</label>
                                 <input type="date" name="actualEndDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                             </td>
@@ -234,25 +269,29 @@
             <div class="p-6 sm:p-8 bg-gray-50 border-t border-gray-200">
                 <h2 class="text-xl font-bold text-gray-800 mb-4">雙簽與結果</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <!-- 執行人簽名 (Required) -->
+                    <!-- 執行人簽名 -->
                     <div class="flex flex-col p-4 bg-white rounded-lg shadow-md border-t-4 border-indigo-300">
                         <label class="font-bold text-indigo-600 mb-2">執行人 (Executor) 簽核 <span class="text-red-500">*</span></label>
                         <p class="text-sm text-gray-500 mb-2">設定預算的第一責任人。</p>
                         <input type="text" name="executor" id="executorInput" placeholder="請輸入姓名/工號確認" class="p-2 border-b border-gray-300 bg-gray-50 focus:border-indigo-500" required>
-                        <div class="mt-3 text-xs text-gray-400">簽核時間: <span id="executorTime"></span></div>
+                        <div class="mt-3 text-xs text-gray-400">
+                            執行人最後更新: <span id="executorTimeDisplay" class="font-medium text-gray-700">N/A</span>
+                        </div>
                     </div>
                     
-                    <!-- 核對人簽名 (Optional) -->
+                    <!-- 核對人簽名 -->
                     <div class="flex flex-col p-4 bg-white rounded-lg shadow-md border-t-4 border-green-500">
                         <label class="font-bold text-green-600 mb-2">核對人 (Reviewer) 獨立確認</label>
                         <p class="text-sm text-gray-500 mb-2">獨立核對並確認設定值與要求數值相符。</p>
                         <input type="text" name="reviewer" id="reviewerInput" placeholder="選填：請輸入姓名/工號確認" class="p-2 border-b border-gray-300 bg-gray-50 focus:border-green-500">
-                        <div class="mt-3 text-xs text-gray-400">簽核時間: <span id="reviewerTime"></span></div>
+                        <div class="mt-3 text-xs text-gray-400">
+                            核對人最後更新: <span id="reviewerTimeDisplay" class="font-medium text-gray-700">N/A</span>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- 結果欄位 (Optional) -->
-                <div class="mt-6 p-4 bg-white rounded-lg shadow-md">
+                <!-- 結果欄位 -->
+                <div class="mt-6 p-4 bg-white rounded-lg shadow-md reviewer-field">
                     <label class="font-bold text-gray-800 mb-2 block">最終核對結果</label>
                     <select name="result" id="resultSelect" class="p-3 border border-gray-300 rounded-lg w-full text-lg font-semibold text-center focus:ring-indigo-500 focus:border-indigo-500">
                         <option value="">-- 請選擇 --</option>
@@ -267,16 +306,15 @@
                     <textarea id="notes" name="notes" rows="3" placeholder="請填寫任何特殊情況或修正過程。" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                 </div>
 
-                <!-- 動作按鈕 (新增 "新增資料" 按鈕) -->
+                <!-- 動作按鈕 -->
                 <div class="mt-8 flex flex-col sm:flex-row gap-4">
-                    <button type="submit" id="saveButton" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg disabled:bg-gray-400">
-                        💾 儲存結果
+                    <button type="submit" id="saveButton" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg disabled:bg-gray-400" disabled>
+                        💾 儲存 (請先登入)
                     </button>
-                    <!-- 新增一筆新資料按鈕，現在會呼叫 window.resetForm 來確保作用域正確 -->
-                    <button type="button" id="newRecordButton" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg">
+                    <button type="button" id="newRecordButton" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg" disabled>
                         ➕ 新增一筆新資料
                     </button>
-                    <button type="button" id="exportButton" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg disabled:bg-gray-400">
+                    <button type="button" id="exportButton" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg" disabled>
                         ⬇️ 匯出 Excel/CSV 表單
                     </button>
                 </div>
@@ -289,9 +327,9 @@
         
         <!-- 歷史記錄區塊 -->
         <div id="historySection" class="p-6 sm:p-8 bg-gray-100 border-t border-gray-300 mt-4">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">歷史核對記錄 (所有用戶共享)</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-4">歷史核對記錄</h2>
             <div id="historyTableContainer" class="overflow-x-auto">
-                <p class="text-gray-500">正在載入歷史記錄...</p>
+                <p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>
             </div>
             <div id="historyStatus" class="mt-4 text-sm font-medium text-center text-gray-600"></div>
         </div>
@@ -302,22 +340,26 @@
 
     </div>
 
+    <!-- 管理員後台 Modal -->
+    <div id="adminPanel" class="hidden">
+        <div class="admin-content">
+            <h3 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">管理員後台 - 提升權限</h3>
+            <p class="text-sm text-gray-600 mb-4">只有管理員 (${lsiaobai@gmail.com}) 可以看到此面板並設置其他用戶為管理者。</p>
+            
+            <div id="userListContainer" class="max-h-80 overflow-y-auto border p-3 rounded-lg bg-gray-50">
+                <p class="text-center text-gray-500">載入用戶中...</p>
+            </div>
+            
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeAdminPanel()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
+                    關閉
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <script>
-        // JavaScript 僅用於自動填寫簽核時間（模擬電子簽核的一部分）
-        function updateTimeStamps() {
-            const now = new Date();
-            const timeString = now.toLocaleString('zh-TW', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-
-            document.getElementById('executorTime').textContent = timeString;
-            document.getElementById('reviewerTime').textContent = timeString;
-        }
+        // --- 非模組腳本區塊 (純粹的 UI 輔助功能) ---
         
         // Function to calculate the number of days between two dates (inclusive)
         function calculateDays(startDate, endDate) {
@@ -325,14 +367,11 @@
             const start = new Date(startDate);
             const end = new Date(endDate);
 
-            // Check if end date is before start date
             if (start > end) return 0;
 
-            // Calculate difference in milliseconds
             const diffTime = Math.abs(end.getTime() - start.getTime());
             
             // Convert to days (add 1 for inclusive count)
-            // Use 1000 * 60 * 60 * 24 
             const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
             
             return diffDays;
@@ -374,7 +413,6 @@
 
             const estimatedTotal = dailyBudget * days;
             
-            // Simple currency formatting 
             const formattedTotal = estimatedTotal.toLocaleString('zh-TW', {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 2
@@ -384,19 +422,21 @@
             resultEl.classList.add('text-green-700');
         }
 
-        // 為了模擬，我們在載入時更新一次時間
-        updateTimeStamps();
-
         document.addEventListener('DOMContentLoaded', () => {
              document.getElementById('calculateBudgetButton').addEventListener('click', calculateEstimatedBudget);
-             // 注意：newRecordButton 的事件監聽器已移至 type="module" 區塊以確保可以調用 resetForm
         });
+
+        // 為了讓 Modal 可以從 HTML 內聯調用
+        function closeAdminPanel() {
+            document.getElementById('adminPanel').style.display = 'none';
+        }
+
     </script>
     
-    <!-- FIREBASE 儲存與匯出功能 (已調整為公共/共享路徑) -->
+    <!-- FIREBASE 核心功能 (驗證, 儲存, 權限控管) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
             collection, 
@@ -406,15 +446,16 @@
             doc,
             setDoc,
             deleteDoc,
+            getDocs,
             setLogLevel,
+            query,
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // 設定 Firebase Debug Log
         setLogLevel('Debug');
 
-        // --- CUSTOM FIREBASE CONFIGURATION (FOR EXTERNAL USE) ---
-        // 🚨 這是修復外部部署的關鍵區塊 🚨
-        // 您提供的設定已貼上：
+        // --- FIREBASE CONFIGURATION ---
+        // 請注意：這裡的配置應來自您的 Firebase 專案設定
         const userFirebaseConfig = {
             apiKey: "AIzaSyB7GaY2z3mKeD3bd9r_KVcd_VYMzz42c7c", 
             authDomain: "budgetcheck-7a2e9.firebaseapp.com",
@@ -424,38 +465,43 @@
             appId: "1:1084663157523:web:4e8160c5c3da30f92380e6", 
             measurementId: "G-81VM0XN7VC" 
         };
-        // --- END CUSTOM FIREBASE CONFIGURATION ---
+        // --- END CONFIGURATION ---
 
         // Global Firebase variables: 優先使用 Canvas 提供的設定，如果沒有則使用自定義設定
         const canvasFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         const canvasAppId = typeof __app_id !== 'undefined' ? __app_id : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        const configToUse = canvasFirebaseConfig || userFirebaseConfig;
         
-        // 決定最終 App ID (用於資料庫路徑)
+        const configToUse = canvasFirebaseConfig || userFirebaseConfig;
         const finalAppId = canvasAppId || userFirebaseConfig.projectId || 'default-external-app-id';
-
-        let app = null;
-        let db = null;
-        let auth = null;
-        let userId = 'N/A';
+        
+        // --- 應用程式狀態 ---
+        let app, db, auth;
+        let currentUser = null; // Firebase User Object
+        let userId = null;
+        let userEmail = null;
+        let isAdmin = false;
         let checklistData = []; 
         let editingId = null; 
+        let editMode = 'new'; // 'new', 'edit_executor', 'edit_reviewer'
 
-        // 核心變更點: 使用公共路徑以實現共享歷史紀錄
-        const PUBLIC_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/budget_checklists`;
+        // --- Firestore 路徑 ---
+        const CHECKLIST_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/budget_checklists`;
+        const USER_ROLES_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/user_roles`;
         
-        
-        // Field groups for dynamic requirement setting
-        const accountBudgetFields = [
-            'targetOriginalAccountBudget', 'actualOriginalAccountBudget', 
-            'targetAccountBudgetAfterTopUp', 'actualAccountBudgetAfterTopUp'
+        // --- 管理者硬編碼郵箱 (預設管理者) ---
+        const DEFAULT_ADMIN_EMAIL = "lsiaobai@gmail.com"; 
+
+        // --- 欄位分類 ---
+        const executorFields = [
+            'clientName', 'date', 'platform', 'verificationType', 'accountNameId',
+            'targetOriginalAccountBudget', 'targetAccountBudgetAfterTopUp', 
+            'adBudgetType', 'targetAmount', 'targetStartDate', 'targetEndDate',
+            'executor', 'notes'
         ];
-        
-        const adBudgetFields = [
-            'adBudgetType', 'targetAmount', 'actualSet', 
-            'targetStartDate', 'targetEndDate', 'actualStartDate', 'actualEndDate'
+        const reviewerFields = [
+            'actualOriginalAccountBudget', 'actualAccountBudgetAfterTopUp', 
+            'actualSet', 'actualStartDate', 'actualEndDate',
+            'reviewer', 'result'
         ];
 
         // Utility function to show status messages
@@ -476,76 +522,196 @@
             }
         }
         
-        /**
-         * Dynamically sets the 'required' attribute on specified form elements and toggles the is-required class on their containers.
-         */
-        function setRequiredState(fieldNames, isRequired) {
-            const form = document.getElementById('checklistForm');
-            fieldNames.forEach(name => {
-                const element = form.elements[name];
-                
-                // 判斷是否為檢核設定欄位 (實際/設定值) 或最終結果欄位，這些欄位不需要必填
-                const isReviewerOrResultSetting = name.includes('actual') || name === 'actualSet' || name === 'result'; 
-                
-                if (element) {
-                    if (isRequired && !isReviewerOrResultSetting) { 
-                        element.setAttribute('required', 'required');
-                    } else {
-                        element.removeAttribute('required');
-                    }
-                    
-                    // Toggle parent elements' is-required class for visual feedback
-                    let parentRow = element.closest('tr');
-                    let parentGroup = element.closest('.input-group');
-                    
-                    if (parentRow) {
-                        const categoryCell = parentRow.querySelector('td:first-child');
-                        // 僅對目標欄位 (即非檢核設定欄位) 應用視覺必填標記
-                        if (categoryCell && !isReviewerOrResultSetting) {
-                             categoryCell.classList.toggle('is-required', isRequired);
-                        }
-                    }
-                    
-                    if (parentGroup) {
-                         // 僅對目標欄位 (即非檢核設定欄位) 應用視覺必填標記
-                         if (!isReviewerOrResultSetting) {
-                            parentGroup.classList.toggle('is-required', isRequired);
-                         }
-                    }
-                }
-            });
-        }
-        
-        /**
-         * Main function to handle conditional required fields based on verificationType.
-         */
-        function handleRequiredFields() {
-            const verificationType = document.getElementById('verificationType').value;
+        // --- 驗證與權限核心邏輯 ---
 
-            // 1. Reset all conditional fields to optional first
-            setRequiredState(accountBudgetFields, false);
-            setRequiredState(adBudgetFields, false);
-            
-            // 2. Apply new required states for 'target' fields
-            if (verificationType === 'account_budget') {
-                setRequiredState(accountBudgetFields, true);
-            } else if (verificationType === 'ad_budget') {
-                setRequiredState(adBudgetFields, true);
-            } else if (verificationType === 'all') {
-                setRequiredState(accountBudgetFields, true);
-                setRequiredState(adBudgetFields, true);
+        async function googleSignIn() {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+                // onAuthStateChanged 會處理後續的 UI 更新和資料載入
+            } catch (error) {
+                console.error("Google Sign-In Failed:", error);
+                showStatus(`❌ Google 登入失敗: ${error.message}`, 'error', 'authStatus');
             }
         }
 
-        // Reset the form and editing state (Used by newRecordButton and after save)
+        async function googleSignOut() {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Sign Out Failed:", error);
+            }
+        }
+
+        /**
+         * 檢查用戶角色並儲存/更新到 Firestore
+         */
+        async function checkUserRole(user) {
+            if (!db || !user) {
+                isAdmin = false;
+                return;
+            }
+            
+            const roleDocRef = doc(db, USER_ROLES_COLLECTION_PATH, user.uid);
+            try {
+                const roleSnapshot = await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH))); // 使用 getDocs 來查找所有 roles
+                
+                let foundRole = null;
+                roleSnapshot.forEach(d => {
+                    if (d.id === user.uid) {
+                        foundRole = d.data();
+                    }
+                });
+
+                // 1. 檢查是否為預設管理者
+                if (user.email === DEFAULT_ADMIN_EMAIL) {
+                    isAdmin = true;
+                    // 確保預設管理者在 user_roles 中有記錄
+                    if (!foundRole || foundRole.role !== 'admin') {
+                        await setDoc(roleDocRef, { 
+                            email: user.email, 
+                            role: 'admin',
+                            lastLogin: serverTimestamp() 
+                        }, { merge: true });
+                    }
+                } else if (foundRole) {
+                    // 2. 檢查是否有已設定的角色
+                    isAdmin = foundRole.role === 'admin';
+                } else {
+                    // 3. 預設為一般使用者 (並記錄)
+                    isAdmin = false;
+                    await setDoc(roleDocRef, { 
+                        email: user.email, 
+                        role: 'user',
+                        lastLogin: serverTimestamp() 
+                    }, { merge: true });
+                }
+
+                console.log(`User ${user.email} role: ${isAdmin ? 'Admin' : 'User'}`);
+            } catch (e) {
+                console.error("Error checking user role:", e);
+                isAdmin = false; // 發生錯誤時，預設為非管理者
+            }
+        }
+
+        /**
+         * 處理身份驗證狀態改變
+         */
+        function handleAuthStateChange(user) {
+            const authButton = document.getElementById('authButton');
+            const userEmailDisplay = document.getElementById('userEmailDisplay');
+            const adminPanelButton = document.getElementById('adminPanelButton');
+            
+            currentUser = user;
+            
+            if (user) {
+                userId = user.uid;
+                userEmail = user.email;
+                
+                checkUserRole(user).then(() => {
+                    // 更新 UI 狀態
+                    authButton.textContent = '登出';
+                    authButton.onclick = googleSignOut;
+                    userEmailDisplay.innerHTML = `**${userEmail}** (${isAdmin ? '管理者' : '一般用戶'})`;
+                    document.getElementById('checklistForm').classList.remove('hidden');
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+                    
+                    document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false);
+
+                    if (isAdmin) {
+                        adminPanelButton.classList.remove('hidden');
+                        adminPanelButton.onclick = openAdminPanel;
+                    } else {
+                         adminPanelButton.classList.add('hidden');
+                    }
+                    
+                    loadChecklists(); // 登入後載入資料
+                });
+
+            } else {
+                // 未登入狀態
+                userId = null;
+                userEmail = null;
+                isAdmin = false;
+                authButton.textContent = '登入 Google';
+                authButton.onclick = googleSignIn;
+                userEmailDisplay.innerHTML = '請登入 Google';
+                document.getElementById('checklistForm').classList.add('hidden');
+                document.getElementById('historyTableContainer').innerHTML = '<p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>';
+                document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true);
+                adminPanelButton.classList.add('hidden');
+                document.getElementById('loadingIndicator').classList.add('hidden');
+            }
+        }
+        
+        // --- 表單流程控制 ---
+
+        /**
+         * 根據當前模式 (新增/修改執行/檢核) 鎖定或解鎖欄位
+         */
+        function setFormMode(mode, currentCreatorId = null) {
+            editMode = mode;
+            const form = document.getElementById('checklistForm');
+            const saveButton = document.getElementById('saveButton');
+            const isCreator = currentCreatorId === userId;
+            
+            // 1. 執行人 (executor) 欄位控制
+            form.querySelectorAll('.executor-field input, .executor-field select').forEach(el => {
+                const isExecutorModifiable = (mode === 'new' || (mode === 'edit_executor' && isCreator));
+                el.disabled = !isExecutorModifiable;
+                // 新增資料或修改執行資料時，必填欄位才需要 required 屬性
+                if (executorFields.includes(el.name)) {
+                    el.required = (mode === 'new' || mode === 'edit_executor');
+                }
+            });
+
+            // 2. 檢核人 (reviewer) 欄位控制
+            form.querySelectorAll('.reviewer-field input, .reviewer-field select').forEach(el => {
+                const isReviewerModifiable = (mode === 'edit_reviewer' && !isCreator);
+                el.disabled = !isReviewerModifiable;
+                // 檢核資料時，檢核人姓名和結果是必填
+                if (el.name === 'reviewer' || el.name === 'result') {
+                    el.required = mode === 'edit_reviewer';
+                }
+            });
+            
+            // 3. 基本資料欄位 (Creator only)
+            form.elements['clientName'].disabled = (mode !== 'new' && !isCreator);
+            form.elements['date'].disabled = (mode !== 'new' && !isCreator);
+            form.elements['platform'].disabled = (mode !== 'new' && !isCreator);
+            form.elements['verificationType'].disabled = (mode !== 'new' && !isCreator);
+            form.elements['accountNameId'].disabled = (mode !== 'new' && !isCreator);
+
+            // 4. 備註欄位 (Notes) - 兩邊都可以寫
+            form.elements['notes'].disabled = false;
+            
+            // 5. 更新按鈕文字
+            if (mode === 'new') {
+                document.getElementById('formTitle').textContent = "廣告活動與預算細節 (新增執行設定)";
+                saveButton.textContent = "💾 儲存執行設定 (建立新紀錄)";
+                saveButton.disabled = false;
+            } else if (mode === 'edit_executor') {
+                document.getElementById('formTitle').textContent = `廣告活動與預算細節 (修改執行設定)`;
+                saveButton.textContent = "🔄 更新執行設定";
+                saveButton.disabled = false;
+            } else if (mode === 'edit_reviewer') {
+                document.getElementById('formTitle').textContent = `廣告活動與預算細節 (進行檢核)`;
+                saveButton.textContent = "✅ 儲存檢核結果";
+                saveButton.disabled = false;
+            }
+        }
+
+        // Reset the form and editing state
         function resetForm() {
             document.getElementById('checklistForm').reset();
-            document.getElementById('formTitle').textContent = "廣告活動與預算細節";
-            document.getElementById('saveButton').textContent = "💾 儲存結果";
             editingId = null;
             
-            handleRequiredFields();
-
+            // 清空時間戳記顯示
+            document.getElementById('executorTimeDisplay').textContent = 'N/A';
+            document.getElementById('reviewerTimeDisplay').textContent = 'N/A';
+            
+            setFormMode('new'); // 切換回新增模式
+            
             // Clear calculation result
             document.getElementById('calculatedResult').textContent = '（點擊按鈕進行計算）'; 
             document.getElementById('calculatedResult').classList.remove('text-red-600', 'text-green-700');
@@ -556,72 +722,85 @@
         function collectFormData() {
             const form = document.getElementById('checklistForm');
             
-            // Native browser validation check before collecting data
             if (!form.checkValidity()) {
-                showStatus("錯誤：請檢查並填寫所有標註星號的必填欄位 (僅執行設定、客戶名稱與日期)。", 'error');
+                showStatus("錯誤：請檢查並填寫所有標註星號的必填欄位。", 'error');
                 return null;
             }
             
-            // 確保所有數據被收集，即使是空值 (檢核設定欄位與最終結果欄位可能為空)
-            const data = {
+            const baseData = {
                 clientName: form.elements['clientName'].value,
                 date: form.elements['date'].value,
                 platform: form.elements['platform'].value,
                 verificationType: form.elements['verificationType'].value, 
-                campaignName: form.elements['campaignName'].value, 
-                targetOriginalAccountBudget: form.elements['targetOriginalAccountBudget'].value, 
-                actualOriginalAccountBudget: form.elements['actualOriginalAccountBudget'].value, 
-                targetAccountBudgetAfterTopUp: form.elements['targetAccountBudgetAfterTopUp'].value, 
-                actualAccountBudgetAfterTopUp: form.elements['actualAccountBudgetAfterTopUp'].value, 
-                adBudgetType: form.elements['adBudgetType'].value, 
-                targetAmount: form.elements['targetAmount'].value,
-                actualSet: form.elements['actualSet'].value,
-                targetStartDate: form.elements['targetStartDate'].value, 
-                targetEndDate: form.elements['targetEndDate'].value,     
-                actualStartDate: form.elements['actualStartDate'].value, 
-                actualEndDate: form.elements['actualEndDate'].value,     
-                executor: form.elements['executor'].value,
-                reviewer: form.elements['reviewer'].value, 
-                result: form.elements['result'].value, 
+                accountNameId: form.elements['accountNameId'].value, // 新欄位
                 notes: form.elements['notes'].value,
-                createdAt: serverTimestamp(),
-                // 新增欄位來儲存創建此記錄的使用者 ID，用於共享環境下的追蹤
-                createdByUserId: userId 
             };
+            
+            let dataToSave = {};
 
-            // Business logic check: If the user explicitly selects 'fail', we prevent saving.
-            if (data.result === 'fail') {
-                showStatus("錯誤：核對結果為「不通過」，請先修正後再儲存。", 'error');
-                return null;
+            if (editMode === 'new') {
+                // 新增模式：只收集 Executor 欄位 + 基本資料 + 創建資訊
+                dataToSave = {
+                    ...baseData,
+                    ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
+                    createdByUserId: userId,
+                    creatorEmail: userEmail,
+                    executionTimestamp: serverTimestamp(), // 建立時即為執行時間
+                    reviewTimestamp: null, // 檢核時間為空
+                };
+            } else if (editMode === 'edit_executor') {
+                // 修改執行模式：只允許修改 Executor 欄位 + 更新時間
+                dataToSave = {
+                    // 必須包含所有 Executor 欄位
+                    ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
+                    notes: form.elements['notes'].value, // 備註可修改
+                    executionTimestamp: serverTimestamp(), // 更新執行時間
+                };
+            } else if (editMode === 'edit_reviewer') {
+                 // 修改檢核模式：只允許修改 Reviewer 欄位 + 更新時間
+                dataToSave = {
+                    // 必須包含所有 Reviewer 欄位
+                    ...reviewerFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
+                    notes: form.elements['notes'].value, // 備註可修改
+                    reviewer: form.elements['reviewer'].value, // 檢核人必填
+                    result: form.elements['result'].value, // 結果必填
+                    reviewTimestamp: serverTimestamp(), // 更新檢核時間
+                };
+
+                // 檢核結果為「不通過」時阻止儲存 (前端提示)
+                if (dataToSave.result === 'fail') {
+                    showStatus("錯誤：核對結果為「不通過」，請先修正並將結果改為「通過」或在備註說明後再儲存。", 'error');
+                    return null;
+                }
             }
-
-            return data;
+            
+            return dataToSave;
         }
 
         // Save (Add or Update) to Firestore
         async function saveChecklist(event) {
-            event.preventDefault(); // Prevent default form submission
-            if (!db) {
-                 showStatus("❌ 儲存失敗: Firebase 尚未初始化。請檢查您的 Firebase 配置。", 'error');
+            event.preventDefault(); 
+            if (!db || !userId) {
+                 showStatus("❌ 儲存失敗: 請先登入。", 'error');
                  return;
             }
             
             const data = collectFormData();
             if (!data) return;
             
-            // 使用公共路徑以共享資料
-            const path = PUBLIC_COLLECTION_PATH;
+            // 新增資料時，使用 addDoc (Firestore 自動產生 ID)
+            const path = CHECKLIST_COLLECTION_PATH;
             const docRef = editingId ? doc(db, path, editingId) : collection(db, path);
 
             try {
                 if (editingId) {
-                    // Update existing document
-                    await setDoc(docRef, data);
-                    showStatus("✅ 核對結果已成功更新。", 'success');
+                    // Update existing document using setDoc (Firestore Rules will check permissions)
+                    await setDoc(doc(db, path, editingId), data, { merge: true });
+                    showStatus(`✅ 核對結果已成功更新 (${editMode})。`, 'success');
                 } else {
                     // Add new document
                     await addDoc(docRef, data);
-                    showStatus("✅ 核對結果已成功儲存至雲端共享記錄。", 'success');
+                    showStatus("✅ 執行設定已成功儲存並建立新紀錄。", 'success');
                 }
                 resetForm(); // Reset form after successful save/update
                 
@@ -634,59 +813,62 @@
 
         // Load data using onSnapshot (and re-render the history table)
         function loadChecklists() {
-            if (!db) return;
-            // 使用公共路徑以共享資料
-            const path = PUBLIC_COLLECTION_PATH;
+            if (!db || !userId) return;
+            const path = CHECKLIST_COLLECTION_PATH;
             const q = collection(db, path); 
 
             onSnapshot(q, (snapshot) => {
-                // 將資料儲存到全域變數
                 checklistData = snapshot.docs.map(doc => {
                     const data = doc.data();
+                    const formatTimestamp = (ts) => ts?.toDate()?.toLocaleString('zh-TW') || 'N/A';
                     return {
                         id: doc.id,
                         ...data,
-                        createdAt: data.createdAt?.toDate().toLocaleString('zh-TW') || 'N/A'
+                        executionTimestampDisplay: formatTimestamp(data.executionTimestamp),
+                        reviewTimestampDisplay: formatTimestamp(data.reviewTimestamp),
                     };
-                }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // 依時間倒序排列
+                }).sort((a, b) => {
+                    // 優先按執行時間倒序排列
+                    const tsA = b.executionTimestampDisplay !== 'N/A' ? new Date(b.executionTimestampDisplay) : new Date(0);
+                    const tsB = a.executionTimestampDisplay !== 'N/A' ? new Date(a.executionTimestampDisplay) : new Date(0);
+                    return tsA - tsB;
+                }); 
 
-                showStatus(`💾 已載入 ${checklistData.length} 筆共享歷史核對記錄。`, 'info', 'historyStatus');
-                renderHistoryTable(); // 載入後渲染表格
+                showStatus(`💾 已載入 ${checklistData.length} 筆歷史核對記錄。`, 'info', 'historyStatus');
+                renderHistoryTable(); 
             }, (error) => {
                 console.error("Error listening to collection: ", error);
-                // 這裡會捕獲 'Missing or insufficient permissions.' 錯誤
-                showStatus(`❌ 載入歷史記錄失敗: ${error.message}。請檢查您的 Firestore 安全規則！`, 'error', 'historyStatus');
+                showStatus(`❌ 載入歷史記錄失敗: ${error.message}。`, 'error', 'historyStatus');
             });
         }
 
         // Delete a record
         async function deleteChecklist(id) {
-            if (!db) return;
-            
-            const confirmation = window.confirm("確定要刪除這筆記錄嗎？此操作無法復原。"); // 暫時代替 custom modal
-            if (!confirmation) {
+            if (!db || !isAdmin) {
+                showStatus("❌ 刪除失敗: 只有管理者可以刪除資料。", 'error', 'historyStatus');
                 return;
             }
             
-            // 使用公共路徑
-            const path = PUBLIC_COLLECTION_PATH;
+            const confirmation = confirm("確定要刪除這筆記錄嗎？此操作無法復原。"); 
+            if (!confirmation) return;
+            
+            const path = CHECKLIST_COLLECTION_PATH;
             const docRef = doc(db, path, id);
             
             try {
                 await deleteDoc(docRef);
                 showStatus("🗑️ 記錄已刪除。", 'success', 'historyStatus');
-                // If the user was editing the deleted item, reset the form
                 if (editingId === id) {
                     resetForm();
                 }
             } catch (e) {
                 console.error("Error deleting document: ", e);
-                showStatus(`❌ 刪除失敗: ${e.message}。請檢查您的 Firestore 安全規則！`, 'error', 'historyStatus');
+                showStatus(`❌ 刪除失敗: ${e.message}。`, 'error', 'historyStatus');
             }
         }
 
-        // Start editing a record
-        function startEdit(id) {
+        // Start editing/reviewing a record
+        function startEditOrReview(id, mode) {
             const item = checklistData.find(d => d.id === id);
             if (!item) {
                 showStatus(`找不到 ID 為 ${id} 的記錄。`, 'error');
@@ -697,23 +879,22 @@
             // 1. 填充表單
             for (const key in item) {
                 if (form.elements[key]) {
-                    // 確保空值不會覆蓋 placeholder，並且所有欄位都能被填充
                     form.elements[key].value = item[key] || '';
                 }
             }
+            
+            // 填充簽核時間
+            document.getElementById('executorTimeDisplay').textContent = item.executionTimestampDisplay;
+            document.getElementById('reviewerTimeDisplay').textContent = item.reviewTimestampDisplay;
 
             // 2. 更新編輯狀態
             editingId = id;
-            document.getElementById('formTitle').textContent = `廣告活動與預算細節 (正在編輯: ${item.clientName} - ${item.date})`;
-            document.getElementById('saveButton').textContent = "🔄 更新結果";
-            
-            // 3. 重新運行必填欄位邏輯以匹配載入的紀錄
-            handleRequiredFields();
+            setFormMode(mode, item.createdByUserId);
 
-            // 4. 滾動到表單頂部
+            // 3. 滾動到表單頂部
             document.getElementById('formTitle').scrollIntoView({ behavior: 'smooth' });
 
-            // 5. 重設計算結果
+            // 4. 重設計算結果
             document.getElementById('calculatedResult').textContent = '（點擊按鈕進行重新計算）'; 
             document.getElementById('calculatedResult').classList.remove('text-red-600', 'text-green-700');
         }
@@ -730,13 +911,12 @@
                 <table class="w-full text-sm text-left text-gray-700 bg-white shadow-md rounded-lg overflow-hidden">
                     <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>
-                            <th scope="col" class="px-6 py-3">客戶 / 活動名稱</th>
-                            <th scope="col" class="px-6 py-3">檢核類型</th> 
-                            <th scope="col" class="px-6 py-3">期間 (執行設定)</th>
+                            <th scope="col" class="px-6 py-3">帳號/客戶名稱</th>
                             <th scope="col" class="px-6 py-3">執行人</th> 
-                            <th scope="col" class="px-6 py-3">建立者 (User ID)</th>
+                            <th scope="col" class="px-6 py-3">檢核人</th>
                             <th scope="col" class="px-6 py-3">結果</th>
-                            <th scope="col" class="px-6 py-3">簽核時間</th>
+                            <th scope="col" class="px-6 py-3">最後執行時間</th>
+                            <th scope="col" class="px-6 py-3">最後檢核時間</th>
                             <th scope="col" class="px-6 py-3">操作</th>
                         </tr>
                     </thead>
@@ -745,52 +925,48 @@
 
             checklistData.forEach(item => {
                 const statusClass = item.result === 'pass' ? 'text-green-600 bg-green-50' : (item.result === 'fail' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50');
-                const statusText = item.result === 'pass' ? '✅ 通過' : (item.result === 'fail' ? '❌ 不通過' : '⚪ 待確認');
-                const duration = item.targetStartDate && item.targetEndDate 
-                    ? `${item.targetStartDate.slice(5)} ~ ${item.targetEndDate.slice(5)}`
-                    : '未填寫';
-
-                let verificationTypeText;
-                if (item.verificationType === 'account_budget') {
-                    verificationTypeText = `帳戶預算`;
-                } else if (item.verificationType === 'ad_budget') {
-                    verificationTypeText = `廣告預算`;
-                } else if (item.verificationType === 'all') {
-                    verificationTypeText = `全部`;
-                } else {
-                     verificationTypeText = `N/A`;
-                }
+                const statusText = item.result === 'pass' ? '✅ 通過' : (item.result === 'fail' ? '❌ 不通過' : '⚪ 待檢核');
                 
-                // 顯示建立者 User ID (截取前 4 位 + 後 4 位)
-                const creatorId = item.createdByUserId || 'N/A';
-                const displayCreatorId = creatorId.length > 8 
-                    ? `${creatorId.substring(0, 4)}...${creatorId.substring(creatorId.length - 4)}` 
-                    : creatorId;
+                // 判斷操作按鈕
+                const isCreator = item.createdByUserId === userId;
+                let actionButton;
+
+                if (isCreator) {
+                    // Creator can always edit their own executor fields
+                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_executor')" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">修改</button>`;
+                } else if (item.result !== 'pass' && item.result !== 'fail') {
+                    // Others (Reviewer) can review if the result is pending
+                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_reviewer')" class="text-green-600 hover:text-green-900 font-medium mr-3">檢核</button>`;
+                } else {
+                    // Everyone can view completed records (no action needed)
+                    actionButton = `<span class="text-gray-500">已完成</span>`;
+                }
+
+                // Admin only delete button
+                let deleteButton = '';
+                if (isAdmin) {
+                    deleteButton = `<button onclick="window.deleteChecklist('${item.id}')" class="text-red-600 hover:text-red-900 font-medium ml-3">刪除</button>`;
+                }
+
 
                 html += `
                     <tr class="bg-white border-b hover:bg-gray-50">
                         <td class="px-6 py-4 font-medium text-gray-900">
                             ${item.clientName}<br>
-                            <span class="text-xs text-gray-500">${item.campaignName || 'N/A'}</span>
+                            <span class="text-xs text-gray-500">${item.accountNameId || 'N/A'}</span>
                         </td>
-                        <td class="px-6 py-4">
-                            ${verificationTypeText}<br>
-                            <span class="font-bold text-xs text-gray-500">${item.adBudgetType.split(' ')[0] || 'N/A'}</span>
-                        </td>
-                        <td class="px-6 py-4">${duration}</td>
-                        <td class="px-6 py-4 font-medium text-gray-900">${item.executor || 'N/A'}</td> 
-                        <td class="px-6 py-4 text-xs font-mono text-gray-500" title="完整 ID: ${creatorId}">
-                            ${displayCreatorId}
-                        </td>
+                        <td class="px-6 py-4 font-medium text-gray-900">${item.executor || 'N/A'}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">${item.reviewer || 'N/A'}</td> 
                         <td class="px-6 py-4">
                             <span class="text-xs font-medium px-2.5 py-0.5 rounded ${statusClass}">
                                 ${statusText}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-xs">${item.createdAt}</td>
+                        <td class="px-6 py-4 text-xs">${item.executionTimestampDisplay}</td>
+                        <td class="px-6 py-4 text-xs">${item.reviewTimestampDisplay}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <button onclick="window.startEdit('${item.id}')" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">編輯</button>
-                            <button onclick="window.deleteChecklist('${item.id}')" class="text-red-600 hover:text-red-900 font-medium">刪除</button>
+                            ${actionButton}
+                            ${deleteButton}
                         </td>
                     </tr>
                 `;
@@ -802,8 +978,108 @@
             `;
             container.innerHTML = html;
         }
+        
+        // --- 管理員後台功能 ---
 
-        // Export to CSV function 
+        async function openAdminPanel() {
+            if (!isAdmin) return;
+            document.getElementById('adminPanel').style.display = 'flex';
+            
+            const userListContainer = document.getElementById('userListContainer');
+            userListContainer.innerHTML = '<p class="text-center text-gray-500">載入用戶中...</p>';
+
+            try {
+                const q = collection(db, USER_ROLES_COLLECTION_PATH);
+                const querySnapshot = await getDocs(q);
+                
+                let userListHtml = '';
+                querySnapshot.forEach(docSnapshot => {
+                    const userData = docSnapshot.data();
+                    const currentIsAdmin = userData.role === 'admin';
+                    const isCurrentUser = docSnapshot.id === userId;
+
+                    // 只有管理者可以修改其他人的權限
+                    const buttonText = currentIsAdmin ? '降級為一般用戶' : '升級為管理者';
+                    const buttonColor = currentIsAdmin ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600';
+                    const isDisabled = isCurrentUser ? 'disabled' : '';
+                    const disabledClass = isCurrentUser ? 'opacity-50 cursor-not-allowed' : '';
+                    const userRoleText = currentIsAdmin ? '管理者' : '一般用戶';
+
+                    userListHtml += `
+                        <div class="flex items-center justify-between p-3 border-b">
+                            <div>
+                                <p class="font-medium text-gray-900 break-all">${userData.email}</p>
+                                <p class="text-sm text-gray-500">ID: ${docSnapshot.id.substring(0, 8)}... (${userRoleText})</p>
+                            </div>
+                            <button 
+                                id="roleBtn-${docSnapshot.id}"
+                                onclick="window.toggleUserRole('${docSnapshot.id}', '${currentIsAdmin}')"
+                                class="${buttonColor} text-white text-xs font-bold py-1 px-2 rounded-lg transition duration-150 ${disabledClass}"
+                                ${isDisabled}>
+                                ${isCurrentUser ? '自己的權限' : buttonText}
+                            </button>
+                        </div>
+                    `;
+                });
+
+                userListContainer.innerHTML = userListHtml || '<p class="text-center text-gray-500">目前沒有其他用戶記錄。</p>';
+
+            } catch (e) {
+                userListContainer.innerHTML = `<p class="text-red-500">載入用戶列表失敗: ${e.message}</p>`;
+                console.error("Error loading user roles:", e);
+            }
+        }
+        
+        async function toggleUserRole(targetUserId, currentIsAdminString) {
+            if (!isAdmin) return;
+            
+            const currentIsAdmin = currentIsAdminString === 'true';
+            const newRole = currentIsAdmin ? 'user' : 'admin';
+            const roleDocRef = doc(db, USER_ROLES_COLLECTION_PATH, targetUserId);
+
+            try {
+                await setDoc(roleDocRef, { role: newRole }, { merge: true });
+                showStatus(`✅ 用戶 ${targetUserId.substring(0, 8)}... 已成功設置為 ${newRole === 'admin' ? '管理者' : '一般用戶'}。`, 'success', 'historyStatus');
+                openAdminPanel(); // 重新載入列表
+            } catch (e) {
+                showStatus(`❌ 權限變更失敗: ${e.message}`, 'error', 'historyStatus');
+            }
+        }
+
+        // --- 全域函數暴露 (供 HTML 內聯調用) ---
+        window.startEditOrReview = startEditOrReview;
+        window.deleteChecklist = deleteChecklist;
+        window.resetForm = resetForm;
+        window.toggleUserRole = toggleUserRole;
+        window.closeAdminPanel = closeAdminPanel;
+        
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+
+            try {
+                app = initializeApp(configToUse);
+                db = getFirestore(app);
+                auth = getAuth(app);
+            } catch (e) {
+                console.error("Firebase Initialization Failed:", e);
+                showStatus(`❌ 連線錯誤: ${e.message}。請檢查您的 Firebase 配置。`, 'error', 'loadingIndicator');
+                return;
+            }
+            
+            // 設定登入/登出監聽器
+            onAuthStateChanged(auth, handleAuthStateChange);
+            
+            // 表單事件
+            document.getElementById('checklistForm').addEventListener('submit', saveChecklist);
+            document.getElementById('newRecordButton').addEventListener('click', () => { window.resetForm(); });
+            document.getElementById('exportButton').addEventListener('click', exportToCSV);
+            
+            // 首次載入時，將表單設置為新增模式的預設狀態
+            setFormMode('new'); 
+        });
+        
+        // Export to CSV function (must be defined in module scope to access checklistData)
         function exportToCSV() {
             if (checklistData.length === 0) {
                 showStatus("🚫 沒有可匯出的記錄。", 'error');
@@ -812,11 +1088,13 @@
 
             // 1. 定義 CSV 標頭 
             const headers = [
-                "客戶名稱", "建立/修改日期", "廣告平台", "檢核類型", "廣告活動名稱", 
+                "客戶名稱", "建立/修改日期", "廣告平台", "檢核類型", "帳號名稱/帳號ID", // 新欄位
                 "原帳戶執行設定預算", "原帳戶檢核設定預算", "加值後執行設定預算", "加值後檢核設定預算", 
                 "廣告預算類型", "廣告活動執行設定金額", "廣告活動檢核設定金額", 
                 "執行設定開始日期", "執行設定結束日期", "檢核設定開始日期", "檢核設定結束日期", 
-                "執行人", "核對人", "核對結果", "備註", "儲存時間", "建立者User ID" // 新增欄位
+                "執行人", "核對人", "核對結果", "備註", 
+                "最後執行時間", "最後檢核時間", // 新增時間戳記
+                "建立者User ID", "建立者Email" // 新增創建者資訊
             ];
             
             // 2. Map data to header order
@@ -830,7 +1108,7 @@
                     item.date, 
                     item.platform, 
                     item.verificationType, 
-                    item.campaignName, 
+                    item.accountNameId, // 新欄位
                     item.targetOriginalAccountBudget, 
                     item.actualOriginalAccountBudget, 
                     item.targetAccountBudgetAfterTopUp, 
@@ -845,10 +1123,11 @@
                     item.executor, 
                     item.reviewer, 
                     item.result, 
-                    // 處理備註欄位：用雙引號包住並替換換行符號
                     `"${item.notes ? item.notes.replace(/"/g, '""').replace(/\n/g, ' ') : ''}"`,
-                    item.createdAt,
-                    item.createdByUserId || 'N/A' // 新增 User ID
+                    item.executionTimestampDisplay, // 執行時間
+                    item.reviewTimestampDisplay, // 檢核時間
+                    item.createdByUserId || 'N/A', 
+                    item.creatorEmail || 'N/A'
                 ];
                 csvRows.push(row.join(','));
             });
@@ -867,70 +1146,6 @@
             showStatus("⬇️ 歷史紀錄已匯出為 CSV 檔案。", 'success');
         }
 
-        // Global function exposure for button clicks and history table interactions
-        window.startEdit = startEdit;
-        window.deleteChecklist = deleteChecklist;
-        window.resetForm = resetForm;
-
-
-        document.addEventListener('DOMContentLoaded', async () => {
-            // 檢查 Firebase 配置是否足夠
-            const isConfigSufficient = !!configToUse.apiKey && !!configToUse.projectId;
-            
-            if (!isConfigSufficient) {
-                // 如果配置不足，顯示警告並停止 Firebase 初始化
-                document.getElementById('externalDeployAlert').classList.remove('hidden');
-                document.getElementById('historyTableContainer').innerHTML = '<p class="text-red-500 p-4 text-center">無法連線至資料庫：請先在程式碼中填入 Firebase 專案配置。</p>';
-                document.getElementById('saveButton').disabled = true;
-                return;
-            }
-
-            // 1. Auth Setup and Get userId
-            try {
-                // 只有在配置足夠時才初始化
-                app = initializeApp(configToUse);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    // Fallback to anonymous sign-in
-                    await signInAnonymously(auth);
-                }
-            } catch (e) {
-                console.error("Firebase Initialization or Sign-in Failed:", e);
-                document.getElementById('externalDeployAlert').textContent = `❌ 連線錯誤: ${e.message}。請檢查您的 Firebase 配置或安全規則。`;
-                document.getElementById('externalDeployAlert').classList.remove('hidden');
-                document.getElementById('historyTableContainer').innerHTML = '<p class="text-red-500 p-4 text-center">連線至資料庫失敗。請檢查您的連線設定和網路。</p>';
-                document.getElementById('saveButton').disabled = true;
-                return;
-            }
-
-
-            // Get the current user ID after authentication
-            if (auth.currentUser) {
-                userId = auth.currentUser.uid;
-                document.getElementById('authStatus').innerHTML = `**當前用戶 ID:** ${userId}`;
-                document.getElementById('authStatus').classList.add('font-bold', 'text-yellow-300');
-            } else {
-                 userId = crypto.randomUUID();
-                 document.getElementById('authStatus').innerHTML = `**匿名用戶 ID:** ${userId}`;
-            }
-
-            // 2. Initial Setup
-            handleRequiredFields(); // Run once on load
-            loadChecklists(); // Start listening to the shared collection
-            
-            // 3. Add Event Listeners
-            document.getElementById('checklistForm').addEventListener('submit', saveChecklist);
-            document.getElementById('verificationType').addEventListener('change', handleRequiredFields);
-            document.getElementById('newRecordButton').addEventListener('click', () => { window.resetForm(); });
-            document.getElementById('exportButton').addEventListener('click', exportToCSV);
-        });
-
     </script>
 </body>
 </html>
-
-
