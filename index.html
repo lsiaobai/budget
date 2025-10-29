@@ -61,6 +61,10 @@
             <div id="userIdDisplay" class="mt-2 text-xs text-indigo-200 font-mono break-all">
                 <span id="authStatus"></span>
             </div>
+            <!-- Firebase 外部部署提示 -->
+            <div id="externalDeployAlert" class="mt-3 p-2 bg-yellow-400 text-gray-900 rounded-lg text-sm font-semibold hidden">
+                ⚠️ **警告 (GitHub 部署):** Firebase 配置遺失。請在程式碼中替換 `userFirebaseConfig` 變數為您自己的 Firebase 專案金鑰，否則數據將無法儲存。
+            </div>
         </header>
 
         <!-- 表單內容：使用 form 標籤以便於重設 -->
@@ -408,22 +412,41 @@
         // 設定 Firebase Debug Log
         setLogLevel('Debug');
 
+        // --- CUSTOM FIREBASE CONFIGURATION (FOR EXTERNAL USE) ---
+        // 🚨 這是修復外部部署的關鍵區塊 🚨
+        // 如果您在 GitHub Pages 上運行此檔案，請將您自己 Firebase 專案的配置貼到下方。
+        // 請確保您已在該專案中開啟 Firestore 和 Authentication (匿名登入)。
+        const userFirebaseConfig = {
+            apiKey: "AIzaSyB7GaY2z3mKeD3bd9r_KVcd_VYMzz42c7c", // <-- 替換成您的 API Key
+            authDomain: "budgetcheck-7a2e9.firebaseapp.com", // <-- 替換成您的 Auth Domain
+            projectId: "budgetcheck-7a2e9", // <-- 替換成您的 Project ID
+            storageBucket: "budgetcheck-7a2e9.firebasestorage.app", // 選填
+            messagingSenderId: "1084663157523", // 選填
+            appId: "1:1084663157523:web:4e8160c5c3da30f92380e6", // 選填
+            measurementId: "G-81VM0XN7VC" // 選填
+        };
+        // --- END CUSTOM FIREBASE CONFIGURATION ---
 
-        // Global Firebase variables
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        // Global Firebase variables: 優先使用 Canvas 提供的設定，如果沒有則使用自定義設定
+        const canvasFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const canvasAppId = typeof __app_id !== 'undefined' ? __app_id : null;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-        let app = initializeApp(firebaseConfig);
-        let db = getFirestore(app);
-        let auth = getAuth(app);
+        const configToUse = canvasFirebaseConfig || userFirebaseConfig;
         
+        // 決定最終 App ID (用於資料庫路徑)
+        const finalAppId = canvasAppId || userFirebaseConfig.projectId || 'default-external-app-id';
+
+        let app = null;
+        let db = null;
+        let auth = null;
         let userId = 'N/A';
         let checklistData = []; 
         let editingId = null; 
 
-        // !!! 核心變更點: 使用公共路徑以實現共享歷史紀錄 !!!
-        const PUBLIC_COLLECTION_PATH = `/artifacts/${appId}/public/data/budget_checklists`;
+        // 核心變更點: 使用公共路徑以實現共享歷史紀錄
+        const PUBLIC_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/budget_checklists`;
+        
         
         // Field groups for dynamic requirement setting
         const accountBudgetFields = [
@@ -579,8 +602,13 @@
         // Save (Add or Update) to Firestore
         async function saveChecklist(event) {
             event.preventDefault(); // Prevent default form submission
+            if (!db) {
+                 showStatus("❌ 儲存失敗: Firebase 尚未初始化。請檢查您的 Firebase 配置。", 'error');
+                 return;
+            }
+            
             const data = collectFormData();
-            if (!data || !db) return;
+            if (!data) return;
             
             // 使用公共路徑以共享資料
             const path = PUBLIC_COLLECTION_PATH;
@@ -845,17 +873,39 @@
 
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // 1. Auth Setup and Get userId
-            if (initialAuthToken) {
-                await signInWithCustomToken(auth, initialAuthToken).catch(e => {
-                     console.error("Custom token sign-in failed:", e);
-                });
-            } else {
-                // Fallback to anonymous sign-in if no custom token is available
-                await signInAnonymously(auth).catch(e => {
-                     console.error("Anonymous sign-in failed:", e);
-                });
+            // 檢查 Firebase 配置是否足夠
+            const isConfigSufficient = !!configToUse.apiKey && !!configToUse.projectId;
+            
+            if (!isConfigSufficient) {
+                // 如果配置不足，顯示警告並停止 Firebase 初始化
+                document.getElementById('externalDeployAlert').classList.remove('hidden');
+                document.getElementById('historyTableContainer').innerHTML = '<p class="text-red-500 p-4 text-center">無法連線至資料庫：請先在程式碼中填入 Firebase 專案配置。</p>';
+                document.getElementById('saveButton').disabled = true;
+                return;
             }
+
+            // 1. Auth Setup and Get userId
+            try {
+                // 只有在配置足夠時才初始化
+                app = initializeApp(configToUse);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    // Fallback to anonymous sign-in
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.error("Firebase Initialization or Sign-in Failed:", e);
+                document.getElementById('externalDeployAlert').textContent = `❌ 連線錯誤: ${e.message}。請檢查您的 Firebase 配置或安全規則。`;
+                document.getElementById('externalDeployAlert').classList.remove('hidden');
+                document.getElementById('historyTableContainer').innerHTML = '<p class="text-red-500 p-4 text-center">連線至資料庫失敗。請檢查您的連線設定和網路。</p>';
+                document.getElementById('saveButton').disabled = true;
+                return;
+            }
+
 
             // Get the current user ID after authentication
             if (auth.currentUser) {
