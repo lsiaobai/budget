@@ -414,16 +414,15 @@
 
         // --- CUSTOM FIREBASE CONFIGURATION (FOR EXTERNAL USE) ---
         // 🚨 這是修復外部部署的關鍵區塊 🚨
-        // 如果您在 GitHub Pages 上運行此檔案，請將您自己 Firebase 專案的配置貼到下方。
-        // 請確保您已在該專案中開啟 Firestore 和 Authentication (匿名登入)。
+        // 您提供的設定已貼上：
         const userFirebaseConfig = {
-            apiKey: "AIzaSyB7GaY2z3mKeD3bd9r_KVcd_VYMzz42c7c", // <-- 替換成您的 API Key
-            authDomain: "budgetcheck-7a2e9.firebaseapp.com", // <-- 替換成您的 Auth Domain
-            projectId: "budgetcheck-7a2e9", // <-- 替換成您的 Project ID
-            storageBucket: "budgetcheck-7a2e9.firebasestorage.app", // 選填
-            messagingSenderId: "1084663157523", // 選填
-            appId: "1:1084663157523:web:4e8160c5c3da30f92380e6", // 選填
-            measurementId: "G-81VM0XN7VC" // 選填
+            apiKey: "AIzaSyB7GaY2z3mKeD3bd9r_KVcd_VYMzz42c7c", 
+            authDomain: "budgetcheck-7a2e9.firebaseapp.com",
+            projectId: "budgetcheck-7a2e9",
+            storageBucket: "budgetcheck-7a2e9.firebasestorage.app", 
+            messagingSenderId: "1084663157523", 
+            appId: "1:1084663157523:web:4e8160c5c3da30f92380e6", 
+            measurementId: "G-81VM0XN7VC" 
         };
         // --- END CUSTOM FIREBASE CONFIGURATION ---
 
@@ -628,7 +627,8 @@
                 
             } catch (e) {
                 console.error("Error saving document: ", e);
-                showStatus(`❌ 儲存失敗: ${e.message}`, 'error');
+                // 這裡會捕獲 'Missing or insufficient permissions.' 錯誤
+                showStatus(`❌ 儲存失敗: ${e.message}。請檢查您的 Firestore 安全規則！`, 'error');
             }
         }
 
@@ -654,7 +654,8 @@
                 renderHistoryTable(); // 載入後渲染表格
             }, (error) => {
                 console.error("Error listening to collection: ", error);
-                showStatus(`❌ 載入歷史記錄失敗: ${error.message}`, 'error', 'historyStatus');
+                // 這裡會捕獲 'Missing or insufficient permissions.' 錯誤
+                showStatus(`❌ 載入歷史記錄失敗: ${error.message}。請檢查您的 Firestore 安全規則！`, 'error', 'historyStatus');
             });
         }
 
@@ -680,7 +681,7 @@
                 }
             } catch (e) {
                 console.error("Error deleting document: ", e);
-                showStatus(`❌ 刪除失敗: ${e.message}`, 'error', 'historyStatus');
+                showStatus(`❌ 刪除失敗: ${e.message}。請檢查您的 Firestore 安全規則！`, 'error', 'historyStatus');
             }
         }
 
