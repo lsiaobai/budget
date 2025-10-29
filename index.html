@@ -527,11 +527,18 @@
         async function googleSignIn() {
             const provider = new GoogleAuthProvider();
             try {
+                // 登入時如果 Firebase 配置未包含已授權網域，視窗會跳掉或報錯
                 await signInWithPopup(auth, provider);
                 // onAuthStateChanged 會處理後續的 UI 更新和資料載入
             } catch (error) {
                 console.error("Google Sign-In Failed:", error);
-                showStatus(`❌ Google 登入失敗: ${error.message}`, 'error', 'authStatus');
+                let errorMessage = `❌ Google 登入失敗: ${error.message}`;
+                if (error.code === 'auth/unauthorized-domain') {
+                    errorMessage = `❌ Google 登入失敗: Firebase: Error (${error.code})。請至您的 Firebase Console -> Authentication -> Settings -> Authorized domains，將此應用程式的運行網域加入白名單。`;
+                }
+                // 針對無痕模式跳窗問題，通常也是由 'auth/unauthorized-domain' 導致，
+                // 或者彈出視窗被瀏覽器阻擋。
+                showStatus(errorMessage, 'error', 'authStatus');
             }
         }
 
@@ -553,10 +560,15 @@
             }
             
             const roleDocRef = doc(db, USER_ROLES_COLLECTION_PATH, user.uid);
+            
+            // 確保 email 存在並轉換為小寫，以進行穩定的比較
+            const lowerCaseEmail = user.email ? user.email.toLowerCase() : '';
+            const lowerCaseDefaultAdmin = DEFAULT_ADMIN_EMAIL.toLowerCase();
+
             try {
-                const roleSnapshot = await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH))); // 使用 getDocs 來查找所有 roles
-                
+                // 先嘗試從 Firestore 獲取角色資訊
                 let foundRole = null;
+                const roleSnapshot = await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH))); 
                 roleSnapshot.forEach(d => {
                     if (d.id === user.uid) {
                         foundRole = d.data();
@@ -564,7 +576,7 @@
                 });
 
                 // 1. 檢查是否為預設管理者
-                if (user.email === DEFAULT_ADMIN_EMAIL) {
+                if (lowerCaseEmail === lowerCaseDefaultAdmin) {
                     isAdmin = true;
                     // 確保預設管理者在 user_roles 中有記錄
                     if (!foundRole || foundRole.role !== 'admin') {
@@ -577,6 +589,10 @@
                 } else if (foundRole) {
                     // 2. 檢查是否有已設定的角色
                     isAdmin = foundRole.role === 'admin';
+                    // 更新登入時間
+                     await setDoc(roleDocRef, { 
+                        lastLogin: serverTimestamp() 
+                    }, { merge: true });
                 } else {
                     // 3. 預設為一般使用者 (並記錄)
                     isAdmin = false;
@@ -590,7 +606,9 @@
                 console.log(`User ${user.email} role: ${isAdmin ? 'Admin' : 'User'}`);
             } catch (e) {
                 console.error("Error checking user role:", e);
-                isAdmin = false; // 發生錯誤時，預設為非管理者
+                // 載入失敗通常是因為規則不允許讀取，但這不影響 isAdmin 的判斷
+                // 由於 Firestore Rules 已經更新，理論上登入者應該可以讀取 user_roles
+                isAdmin = (lowerCaseEmail === lowerCaseDefaultAdmin); // 發生錯誤時，至少檢查是否為硬編碼管理者
             }
         }
 
@@ -606,15 +624,22 @@
             
             if (user) {
                 userId = user.uid;
-                userEmail = user.email;
+                // 使用 email 作為主要識別，若為 null 則使用 '未提供 Email'
+                userEmail = user.email || '未提供 Email'; 
                 
+                // 清除登入錯誤提示
+                showStatus('', 'info', 'authStatus');
+
+                document.getElementById('loadingIndicator').classList.remove('hidden');
+
                 checkUserRole(user).then(() => {
                     // 更新 UI 狀態
                     authButton.textContent = '登出';
                     authButton.onclick = googleSignOut;
+                    // 修正 userEmail 顯示 null 的問題
                     userEmailDisplay.innerHTML = `**${userEmail}** (${isAdmin ? '管理者' : '一般用戶'})`;
                     document.getElementById('checklistForm').classList.remove('hidden');
-                    document.getElementById('loadingIndicator').classList.add('hidden');
+                    
                     
                     document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false);
 
@@ -626,6 +651,12 @@
                     }
                     
                     loadChecklists(); // 登入後載入資料
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+
+                }).catch(e => {
+                    console.error("Role check failed:", e);
+                    showStatus(`角色檢查失敗: ${e.message}。請檢查 Firestore 規則。`, 'error');
+                    document.getElementById('loadingIndicator').classList.add('hidden');
                 });
 
             } else {
@@ -641,6 +672,7 @@
                 document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true);
                 adminPanelButton.classList.add('hidden');
                 document.getElementById('loadingIndicator').classList.add('hidden');
+                showStatus("您已登出。", 'info');
             }
         }
         
@@ -660,7 +692,7 @@
                 const isExecutorModifiable = (mode === 'new' || (mode === 'edit_executor' && isCreator));
                 el.disabled = !isExecutorModifiable;
                 // 新增資料或修改執行資料時，必填欄位才需要 required 屬性
-                if (executorFields.includes(el.name)) {
+                if (executorFields.includes(el.name) && ['clientName', 'date', 'accountNameId', 'executor'].includes(el.name)) {
                     el.required = (mode === 'new' || mode === 'edit_executor');
                 }
             });
@@ -676,13 +708,14 @@
             });
             
             // 3. 基本資料欄位 (Creator only)
+            // 這些欄位必須放在 executorFields 內進行統一控制
             form.elements['clientName'].disabled = (mode !== 'new' && !isCreator);
             form.elements['date'].disabled = (mode !== 'new' && !isCreator);
             form.elements['platform'].disabled = (mode !== 'new' && !isCreator);
             form.elements['verificationType'].disabled = (mode !== 'new' && !isCreator);
             form.elements['accountNameId'].disabled = (mode !== 'new' && !isCreator);
 
-            // 4. 備註欄位 (Notes) - 兩邊都可以寫
+            // 4. 備註欄位 (Notes) - 兩邊都可以寫，所以統一解鎖
             form.elements['notes'].disabled = false;
             
             // 5. 更新按鈕文字
@@ -727,21 +760,11 @@
                 return null;
             }
             
-            const baseData = {
-                clientName: form.elements['clientName'].value,
-                date: form.elements['date'].value,
-                platform: form.elements['platform'].value,
-                verificationType: form.elements['verificationType'].value, 
-                accountNameId: form.elements['accountNameId'].value, // 新欄位
-                notes: form.elements['notes'].value,
-            };
-            
             let dataToSave = {};
 
             if (editMode === 'new') {
-                // 新增模式：只收集 Executor 欄位 + 基本資料 + 創建資訊
+                // 新增模式：只收集 Executor 欄位 + 創建資訊
                 dataToSave = {
-                    ...baseData,
                     ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
                     createdByUserId: userId,
                     creatorEmail: userEmail,
@@ -751,9 +774,8 @@
             } else if (editMode === 'edit_executor') {
                 // 修改執行模式：只允許修改 Executor 欄位 + 更新時間
                 dataToSave = {
-                    // 必須包含所有 Executor 欄位
                     ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
-                    notes: form.elements['notes'].value, // 備註可修改
+                    // notes 已包含在 executorFields 內
                     executionTimestamp: serverTimestamp(), // 更新執行時間
                 };
             } else if (editMode === 'edit_reviewer') {
@@ -838,7 +860,7 @@
                 renderHistoryTable(); 
             }, (error) => {
                 console.error("Error listening to collection: ", error);
-                showStatus(`❌ 載入歷史記錄失敗: ${error.message}。`, 'error', 'historyStatus');
+                showStatus(`❌ 載入歷史記錄失敗: ${error.message}。請檢查 Firestore 規則是否允許讀取。`, 'error', 'historyStatus');
             });
         }
 
@@ -849,8 +871,7 @@
                 return;
             }
             
-            const confirmation = confirm("確定要刪除這筆記錄嗎？此操作無法復原。"); 
-            if (!confirmation) return;
+            if (!confirm("確定要刪除這筆記錄嗎？此操作無法復原。")) return;
             
             const path = CHECKLIST_COLLECTION_PATH;
             const docRef = doc(db, path, id);
@@ -1129,7 +1150,14 @@
                     item.createdByUserId || 'N/A', 
                     item.creatorEmail || 'N/A'
                 ];
-                csvRows.push(row.join(','));
+                csvRows.push(row.map(cell => {
+                    // 確保逗號被處理
+                    let cellString = String(cell);
+                    if (cellString.includes(',')) {
+                        cellString = `"${cellString.replace(/"/g, '""')}"`;
+                    }
+                    return cellString;
+                }).join(','));
             });
 
             const csvString = csvRows.join('\n');
