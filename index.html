@@ -270,7 +270,7 @@
                 <!-- 動作按鈕 (新增 "新增資料" 按鈕) -->
                 <div class="mt-8 flex flex-col sm:flex-row gap-4">
                     <button type="submit" id="saveButton" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg disabled:bg-gray-400">
-                        💾 儲存核對結果
+                        💾 儲存結果
                     </button>
                     <!-- 新增一筆新資料按鈕，現在會呼叫 window.resetForm 來確保作用域正確 -->
                     <button type="button" id="newRecordButton" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg">
@@ -541,7 +541,7 @@
         function resetForm() {
             document.getElementById('checklistForm').reset();
             document.getElementById('formTitle').textContent = "廣告活動與預算細節";
-            document.getElementById('saveButton').textContent = "💾 儲存核對結果";
+            document.getElementById('saveButton').textContent = "💾 儲存結果";
             editingId = null;
             
             handleRequiredFields();
@@ -932,3 +932,4 @@
     </script>
 </body>
 </html>
+
