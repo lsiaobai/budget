@@ -557,11 +557,17 @@
         }
         
         // --- 驗證與權限核心邏輯 ---
-// 【新增：處理篩選器變更的函數】
-function handleFilterChange(event) {
+// 【最終修正 1: 替換 handleFilterChange 函數宣告】
+// 確保它被註冊到 window，以便內聯 HTML 呼叫
+window.handleFilterChange = function(event) {
     const key = event.target.getAttribute('data-filter-key');
     const value = event.target.value;
     
+    // 檢查 currentFilters 是否存在，如果不存在則初始化
+    if (!window.currentFilters) {
+        window.currentFilters = { executor: 'all', reviewer: 'all', result: 'all' };
+    }
+	
     currentFilters[key] = value;
     
     // 重新渲染表格，應用新的篩選條件
@@ -569,7 +575,7 @@ function handleFilterChange(event) {
 }
 
 // 【新增：清除所有篩選器的函數】
-function clearFilters() {
+window.clearFilters = function() {
     currentFilters = {
         executor: 'all',
         reviewer: 'all',
@@ -577,17 +583,21 @@ function clearFilters() {
     };
     
     // 重設 HTML 選擇器的值
-    // 請確保您的 HTML 元素 ID 與這裡一致
-    document.getElementById('filter-executor').value = 'all';
-    document.getElementById('filter-reviewer').value = 'all';
-    document.getElementById('filter-result').value = 'all';
+    // 必須用 window.document.getElementById 確保存取
+    const executorEl = document.getElementById('filter-executor');
+    const reviewerEl = document.getElementById('filter-reviewer');
+    const resultEl = document.getElementById('filter-result');
     
+    if (executorEl) executorEl.value = 'all';
+    if (reviewerEl) reviewerEl.value = 'all';
+    if (resultEl) resultEl.value = 'all';
+	
     // 重新渲染表格 (它會應用 currentFilters)
     displayChecklistHistory(); 
 }
 
 // 【新增：填充篩選器選項的函數】
-function populateFilterOptions() {
+window.populateFilterOptions = function() {
     // 檢查元素是否存在
     const executorSelect = document.getElementById('filter-executor');
     const reviewerSelect = document.getElementById('filter-reviewer');
@@ -615,9 +625,11 @@ function populateFilterOptions() {
     });
     
     // 重設篩選器為當前值
-    executorSelect.value = currentFilters.executor;
-    reviewerSelect.value = currentFilters.reviewer;
-    document.getElementById('filter-result').value = currentFilters.result;
+    if (window.currentFilters) {
+        executorSelect.value = currentFilters.executor;
+        reviewerSelect.value = currentFilters.reviewer;
+        document.getElementById('filter-result').value = currentFilters.result;
+    }
 }
         async function googleSignIn() {
             const provider = new GoogleAuthProvider();
@@ -1362,6 +1374,7 @@ function displayChecklistHistory() {
     </script>
 </body>
 </html>
+
 
 
 
