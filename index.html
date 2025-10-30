@@ -608,7 +608,7 @@
             }
         }
 
-        /** * 處理身份驗證狀態改變 (已修正：改為 async 函數) */ 
+       /** * 處理身份驗證狀態改變 (已修正：改為 async 函數並強制等待角色載入) */ 
 async function handleAuthStateChange(user) {
     const authButton = document.getElementById('authButton');
     const userEmailDisplay = document.getElementById('userEmailDisplay'); 
@@ -618,11 +618,11 @@ async function handleAuthStateChange(user) {
     
     currentUser = user; 
     
+    // 確保 userId 和 userEmail 在登入狀態下被設定
+    window.userId = user ? user.uid : null;
+    window.userEmail = user ? (user.email || '未提供 Email') : null;
+    
     if (user) { 
-        window.userId = user.uid;
-        // 修正 user.email 可能為 null 的問題
-        window.userEmail = user.email || '未提供 Email'; 
-        
         showStatus('', 'info', 'authStatus'); 
         document.getElementById('loadingIndicator').classList.remove('hidden');
         
@@ -645,6 +645,7 @@ async function handleAuthStateChange(user) {
             if (mainPanel) mainPanel.classList.remove('hidden');
             document.getElementById('checklistForm').classList.remove('hidden'); 
 
+            // 啟用所有按鈕
             document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false); 
             
             if (window.isAdmin) { 
@@ -654,21 +655,19 @@ async function handleAuthStateChange(user) {
                 adminPanelButton.classList.add('hidden'); 
             } 
             
-            loadChecklists(); // 角色確定後才載入資料
+            // 載入歷史記錄
+            loadChecklists(); 
             document.getElementById('loadingIndicator').classList.add('hidden');
             
         } catch (e) {
             console.error("Role check failed:", e); 
-            showStatus(`角色檢查失敗: ${e.message}。正在嘗試登出重置狀態。`, 'error'); 
+            showStatus(`角色檢查失敗: ${e.message}。請嘗試重新整理。`, 'error'); 
             document.getElementById('loadingIndicator').classList.add('hidden'); 
-            // 發生錯誤時，強制進入登出流程，確保狀態一致
-            googleSignOut();
+            // 發生錯誤時，不強制登出，讓用戶嘗試重新整理
         }
 
     } else { 
         // 未登入狀態
-        window.userId = null; 
-        window.userEmail = null; 
         window.isAdmin = false;
         window.currentRole = 'user'; // 重置角色
         
@@ -1270,6 +1269,7 @@ if (isCreator) {
     </script>
 </body>
 </html>
+
 
 
 
