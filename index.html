@@ -782,11 +782,15 @@
                     reviewTimestamp: serverTimestamp(), // 更新檢核時間
                 };
 
+
+	    	// 修正後的程式碼：已移除對「不通過」的儲存限制
+		        /*
                 // 檢核結果為「不通過」時阻止儲存 (前端提示)
                 if (dataToSave.result === 'fail') {
                     showStatus("錯誤：核對結果為「不通過」，請先修正並將結果改為「通過」或在備註說明後再儲存。", 'error');
                     return null;
                 }
+		*/
             }
             
             return dataToSave;
@@ -1237,6 +1241,7 @@
     </script>
 </body>
 </html>
+
 
 
 
