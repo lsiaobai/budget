@@ -948,20 +948,29 @@
                 const statusClass = item.result === 'pass' ? 'text-green-600 bg-green-50' : (item.result === 'fail' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50');
                 const statusText = item.result === 'pass' ? '✅ 通過' : (item.result === 'fail' ? '❌ 不通過' : '⚪ 待檢核');
                 
-                // 判斷操作按鈕
-                const isCreator = item.createdByUserId === userId;
-                let actionButton;
+// 判斷操作按鈕
+const isCreator = item.createdByUserId === userId;
+const currentRole = getRole(); // 獲取當前用戶的角色
+let actionButton;
 
-                if (isCreator) {
-                    // Creator can always edit their own executor fields
-                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_executor')" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">修改</button>`;
-                } else if (item.result !== 'pass' && item.result !== 'fail') {
-                    // Others (Reviewer) can review if the result is pending
-                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_reviewer')" class="text-green-600 hover:text-green-900 font-medium mr-3">檢核</button>`;
-                } else {
-                    // Everyone can view completed records (no action needed)
-                    actionButton = `<span class="text-gray-500">已完成</span>`;
-                }
+if (isCreator) {
+    // 建立者 (Creator) 只能修改自己的，且狀態必須是待執行 (Firestore 規則限制)
+    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_executor')" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">修改</button>`;
+
+} else if (currentRole === 'reviewer') {
+    // 【✅ 修正邏輯：檢核人 (Reviewer) 可以對非自己建立的記錄執行檢核或修改】
+    
+    // 無論狀態是 '待執行', 'pass', 或 'fail'，一律顯示檢核按鈕 (因為規則已放寬)
+    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_reviewer')" class="text-green-600 hover:text-green-900 font-medium mr-3">檢核</button>`;
+
+} else if (currentRole === 'user' && item.result !== 'pass' && item.result !== 'fail') {
+    // 普通用戶 (User) 只能看到待檢核狀態，但不能點擊
+    actionButton = `<span class="text-gray-500">待檢核</span>`;
+
+} else {
+    // 其他情況（已完成的記錄對普通用戶或無法操作的人）
+    actionButton = `<span class="text-gray-500">已完成</span>`;
+}
 
                 // Admin only delete button
                 let deleteButton = '';
@@ -1241,6 +1250,7 @@
     </script>
 </body>
 </html>
+
 
 
 
