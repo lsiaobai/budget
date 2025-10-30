@@ -368,7 +368,28 @@
         </footer>
 
     </div>
+	
+<div id="detailModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+        
+        <div class="flex justify-between items-center pb-3">
+            <div id="modalHeader"></div>
+            <button onclick="closeDetailModal()" class="text-black text-xl leading-none hover:text-gray-700 transition duration-150">
+                &times;
+            </button>
+        </div>
 
+        <div id="detailModalContent" class="mt-2 max-h-[70vh] overflow-y-auto p-4 border rounded-lg bg-gray-50">
+            </div>
+
+        <div class="mt-4 flex justify-end">
+            <button onclick="closeDetailModal()" class="px-4 py-2 bg-indigo-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-150">
+                關閉
+            </button>
+        </div>
+        
+    </div>
+</div>
     <!-- 管理員後台 Modal -->
     <div id="adminPanel" class="hidden">
         <div class="admin-content">
@@ -1026,7 +1047,73 @@ window.populateFilterOptions = function() {
             document.getElementById('calculatedResult').textContent = '（點擊按鈕進行重新計算）'; 
             document.getElementById('calculatedResult').classList.remove('text-red-600', 'text-green-700');
         }
+		
+// 【新增：顯示細節彈出視窗的函數】
+function showDetailModal(id) {
+    const item = checklistData.find(d => d.id === id);
+    if (!item) {
+        showStatus(`找不到 ID 為 ${id} 的記錄細節。`, 'error');
+        return;
+    }
 
+    const modalContent = document.getElementById('detailModalContent');
+    const statusClass = item.result === 'pass' ? 'bg-green-500' : 
+                        item.result === 'fail' ? 'bg-red-500' : 
+                        'bg-blue-500';
+    const resultText = item.result === 'pass' ? '✅ 通過' : 
+                       item.result === 'fail' ? '❌ 不通過' : 
+                       '📝 待執行';
+    
+    // 建立詳細內容 HTML
+    modalContent.innerHTML = `
+        <h3 class="text-2xl font-bold mb-4 border-b pb-2">記錄細節 (${item.id.substring(0, 8)})</h3>
+        
+        <div class="space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b">
+                <span class="font-semibold text-gray-700">簽核結果:</span>
+                <span class="px-3 py-1 text-sm font-bold text-white rounded-full ${statusClass}">${resultText}</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div><span class="font-semibold">客戶名稱:</span> ${item.clientName || 'N/A'}</div>
+                <div><span class="font-semibold">活動日期:</span> ${item.date || 'N/A'}</div>
+                <div><span class="font-semibold">平台:</span> ${item.platform || 'N/A'}</div>
+                <div><span class="font-semibold">驗證類型:</span> ${item.verificationType || 'N/A'}</div>
+                <div><span class="font-semibold">帳戶/ID:</span> ${item.accountNameId || 'N/A'}</div>
+            </div>
+
+            <h4 class="text-lg font-bold mt-6 mb-2 pt-2 border-t">人員與時間</h4>
+            <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div><span class="font-semibold">執行人:</span> ${item.executor} (${item.creatorEmail || 'N/A'})</div>
+                <div><span class="font-semibold">執行時間:</span> ${item.executionTimestampDisplay || 'N/A'}</div>
+                <div><span class="font-semibold">檢核人:</span> ${item.reviewer || 'N/A'}</div>
+                <div><span class="font-semibold">檢核時間:</span> ${item.reviewTimestampDisplay || 'N/A'}</div>
+            </div>
+
+            <h4 class="text-lg font-bold mt-6 mb-2 pt-2 border-t">核對項目細節</h4>
+            <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div><span class="font-semibold text-indigo-700">預算設定 (P1):</span> ${item.budgetSetting || 'N/A'}</div>
+                <div><span class="font-semibold text-indigo-700">受眾設定 (P2):</span> ${item.audienceSetting || 'N/A'}</div>
+                <div><span class="font-semibold text-indigo-700">素材確認 (P3):</span> ${item.materialConfirmation || 'N/A'}</div>
+                <div><span class="font-semibold text-indigo-700">結案報表 (P4):</span> ${item.finalReport || 'N/A'}</div>
+                <div class="col-span-2 mt-4 p-3 bg-gray-50 rounded-lg">
+                    <span class="font-semibold text-red-700">檢核意見/修正備註:</span> ${item.reviewNotes || '無'}
+                </div>
+            </div>
+            
+            <h4 class="text-lg font-bold mt-6 mb-2 pt-2 border-t">總備註</h4>
+            <p class="text-sm p-3 bg-yellow-50 rounded-lg whitespace-pre-wrap">${item.notes || '無額外備註。'}</p>
+        </div>
+    `;
+
+    // 顯示彈出視窗
+    document.getElementById('detailModal').classList.remove('hidden');
+}
+
+// 【新增：關閉彈出視窗的函數】
+function closeDetailModal() {
+    document.getElementById('detailModal').classList.add('hidden');
+}
         // 【完整替換：包含篩選邏輯和表格渲染】
 function displayChecklistHistory() {
     const tableContainer = document.getElementById('historyTableContainer');
@@ -1374,6 +1461,7 @@ function displayChecklistHistory() {
     </script>
 </body>
 </html>
+
 
 
 
