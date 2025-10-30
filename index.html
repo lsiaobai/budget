@@ -770,16 +770,20 @@
     // 6. 核心登入/登出邏輯 (V9 修復時序)
     // =================================================================
 
-    // 登入按鈕點擊處理 (使用 addEventListener)
-    document.getElementById('signInButton').addEventListener('click', () => {
-        const provider = new GoogleAuthProvider(); 
-        signInWithPopup(auth, provider) 
-            .catch(error => {
-                // 登入彈窗被關閉或權限被拒絕也會在這裡
-                console.error("Google 登入失敗:", error);
-                alert(`登入失敗: ${error.message}`);
-            });
-    });
+// 登入按鈕點擊處理 (改用 signInWithRedirect 解決彈窗問題)
+document.getElementById('signInButton').addEventListener('click', () => {
+    const provider = new GoogleAuthProvider(); 
+    
+    // *** 核心修改：從 Popup 改為 Redirect ***
+    signInWithRedirect(auth, provider) 
+        // 註：使用 redirect 時，這裡的 .catch 不會被觸發，
+        // 錯誤會在頁面重新導向回來後，由 getRedirectResult 處理。
+        // 但由於我們主要依賴 onAuthStateChanged，這不是必須的。
+        .catch(error => {
+            console.error("嘗試啟動重新導向失敗:", error);
+            alert(`登入啟動失敗: ${error.message}`);
+        });
+});
 
     // 登出按鈕點擊處理
     document.getElementById('signOutButton').addEventListener('click', () => {
@@ -869,5 +873,6 @@
 </body>
 
 </html>
+
 
 
