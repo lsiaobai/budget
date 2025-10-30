@@ -476,7 +476,7 @@
         
         // --- 應用程式狀態 ---
         let app, db, auth;
-        let currentUser = null; // Firebase User Object
+       // let currentUser = null; // Firebase User Object //
         let userId = null;
         let userEmail = null;
         let isAdmin = false;
@@ -616,7 +616,7 @@ async function handleAuthStateChange(user) {
     const loginPanel = document.getElementById('login-panel');
     const mainPanel = document.getElementById('main-panel');
     
-    currentUser = user; 
+   // currentUser = user; //
     
     // 確保 userId 和 userEmail 在登入狀態下被設定
     window.userId = user ? user.uid : null;
@@ -1269,6 +1269,7 @@ if (isCreator) {
     </script>
 </body>
 </html>
+
 
 
 
