@@ -554,7 +554,7 @@
         async function checkUserRole(user) {
             if (!db || !user) {
                 isAdmin = false;
-				window.currentRole = 'user'; // 發生錯誤或未登入時，預設為普通用戶
+				currentRole = 'user'; // 發生錯誤或未登入時，預設為普通用戶
                 return;
             }
             
@@ -608,7 +608,7 @@
             }
         }
 
-       /** * 處理身份驗證狀態改變 (已修正：改為 async 函數並強制等待角色載入) */ 
+/** * 處理身份驗證狀態改變 (已修正：改為 async 函數並強制等待角色載入，直接設定全域變數) */ 
 async function handleAuthStateChange(user) {
     const authButton = document.getElementById('authButton');
     const userEmailDisplay = document.getElementById('userEmailDisplay'); 
@@ -616,29 +616,31 @@ async function handleAuthStateChange(user) {
     const loginPanel = document.getElementById('login-panel');
     const mainPanel = document.getElementById('main-panel');
     
-   // currentUser = user; //
+    // 【關鍵修正：直接賦值給全域變數 userId 和 userEmail (沒有 window. 前綴)】
+    userId = user ? user.uid : null;
+    userEmail = user ? (user.email || '未提供 Email') : null;
     
-    // 確保 userId 和 userEmail 在登入狀態下被設定
-    window.userId = user ? user.uid : null;
-    window.userEmail = user ? (user.email || '未提供 Email') : null;
+    // 請確認您已經移除頂部的 let currentUser = null; 宣告
+    // 並且已經移除 handleAuthStateChange 函數開頭的 currentUser = user; 賦值
     
     if (user) { 
         showStatus('', 'info', 'authStatus'); 
         document.getElementById('loadingIndicator').classList.remove('hidden');
         
         try {
-            // 【關鍵修正：使用 await 確保角色資訊 (isAdmin, currentRole) 完全載入】
+            // 由於 userId 和 userEmail 已設定，這裡可以安全地執行 await
             await checkUserRole(user); 
-
-            // 確保全域角色變數存在，以便其他函數可以立即使用
-            const roleDisplay = window.currentRole ? `（${window.currentRole} 身份）` : (window.isAdmin ? '（管理者身份）' : '（一般用戶身份）');
-            showStatus(`🟢 登入成功：${window.userEmail} ${roleDisplay}`, 'success', 'historyStatus');
+            // checkUserRole 函數內部需要確保它也直接設定全域的 isAdmin 和 currentRole
+            
+            // 顯示狀態
+            const roleDisplay = currentRole ? `（${currentRole} 身份）` : (isAdmin ? '（管理者身份）' : '（一般用戶身份）');
+            showStatus(`🟢 登入成功：${userEmail} ${roleDisplay}`, 'success', 'historyStatus');
 
             // 更新 UI 狀態 
             authButton.textContent = '登出'; 
             authButton.onclick = googleSignOut; 
             
-            userEmailDisplay.innerHTML = `**${window.userEmail}** ${window.isAdmin ? '(管理者)' : (window.currentRole ? `(${window.currentRole})` : '')}`;
+            userEmailDisplay.innerHTML = `**${userEmail}** ${isAdmin ? '(管理者)' : (currentRole ? `(${currentRole})` : '')}`;
             
             // 隱藏登入面板，顯示主應用程式內容
             if (loginPanel) loginPanel.classList.add('hidden');
@@ -648,7 +650,7 @@ async function handleAuthStateChange(user) {
             // 啟用所有按鈕
             document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false); 
             
-            if (window.isAdmin) { 
+            if (isAdmin) { 
                 adminPanelButton.classList.remove('hidden'); 
                 adminPanelButton.onclick = openAdminPanel; 
             } else { 
@@ -663,13 +665,12 @@ async function handleAuthStateChange(user) {
             console.error("Role check failed:", e); 
             showStatus(`角色檢查失敗: ${e.message}。請嘗試重新整理。`, 'error'); 
             document.getElementById('loadingIndicator').classList.add('hidden'); 
-            // 發生錯誤時，不強制登出，讓用戶嘗試重新整理
         }
 
     } else { 
         // 未登入狀態
-        window.isAdmin = false;
-        window.currentRole = 'user'; // 重置角色
+        isAdmin = false;
+        currentRole = 'user'; // 重置角色
         
         authButton.textContent = '登入 Google';
         authButton.onclick = googleSignIn; 
@@ -1269,6 +1270,7 @@ if (isCreator) {
     </script>
 </body>
 </html>
+
 
 
 
