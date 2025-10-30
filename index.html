@@ -1090,19 +1090,27 @@
             }
         }
 
-        async function removeUserRoleRecord(targetUserId) {
-             if (!isAdmin) return;
+    async function removeUserRoleRecord(targetUserId) {
+    // 檢查是否為管理員
+            if (!isAdmin) return;
 
-            // 確保無法移除自己的角色記錄或預設管理者的記錄
+    // 1. 取得目標使用者資料
             const targetUserData = (await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH)))).docs.find(d => d.id === targetUserId)?.data();
+    
+    // 2. 安全地取出 email
+            const targetUserEmail = targetUserData?.email; 
+
+    // 確保無法移除自己的角色記錄
             if (targetUserId === userId) {
-                 showStatus(`❌ 移除記錄失敗: 無法移除自己的角色記錄。`, 'error', 'historyStatus');
-                 return;
-            }
-            if (targetUserData && targetUserData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL) {
-                 showStatus(`❌ 移除記錄失敗: 無法移除預設管理員的角色記錄。`, 'error', 'historyStatus');
-                 return;
-            }
+                showStatus(`❌ 移除記錄失敗: 無法移除自己的角色記錄。`, 'error', 'historyStatus');
+                return;
+    }
+    
+    // 3. 確保無法移除預設管理者的記錄 (已修正為安全檢查)
+            if (targetUserEmail && targetUserEmail.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase()) {
+                showStatus(`❌ 移除記錄失敗: 無法移除預設管理員的角色記錄。`, 'error', 'historyStatus');
+                return;
+    }
 
             if (!confirm(`確定要移除用戶 ${targetUserId.substring(0, 8)}... 在 Firestore 中的角色記錄嗎？這將使他變回一般用戶。`)) return;
 
@@ -1112,10 +1120,10 @@
                 await deleteDoc(roleDocRef);
                 showStatus(`🗑️ 用戶 ${targetUserId.substring(0, 8)}... 的角色記錄已移除。`, 'success', 'historyStatus');
                 openAdminPanel(); // 重新載入列表
-            } catch (e) {
+    }         catch (e) {
                 showStatus(`❌ 移除角色記錄失敗: ${e.message}`, 'error', 'historyStatus');
-            }
-        }
+    }
+}
 
 
         // --- 全域函數暴露 (供 HTML 內聯調用) ---
@@ -1229,4 +1237,5 @@
     </script>
 </body>
 </html>
+
 
