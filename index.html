@@ -554,6 +554,7 @@
         async function checkUserRole(user) {
             if (!db || !user) {
                 isAdmin = false;
+				window.currentRole = 'user'; // 發生錯誤或未登入時，預設為普通用戶
                 return;
             }
             
@@ -570,6 +571,7 @@
                 // 1. 檢查是否為預設管理者 (硬編碼)
                 if (lowerCaseEmail === DEFAULT_ADMIN_EMAIL) {
                     isAdmin = true;
+					window.currentRole = 'admin';
                     // 確保預設管理者在 user_roles 中有記錄且角色正確
                     if (!foundRole || foundRole.role !== 'admin' || foundRole.email.toLowerCase() !== lowerCaseEmail) {
                         await setDoc(roleDocRef, { 
@@ -581,6 +583,7 @@
                 } else if (foundRole) {
                     // 2. 檢查是否有已設定的角色
                     isAdmin = foundRole.role === 'admin';
+					window.currentRole = foundRole.role;
                     // 更新登入時間
                      await setDoc(roleDocRef, { 
                         lastLogin: serverTimestamp() 
@@ -588,6 +591,7 @@
                 } else {
                     // 3. 預設為一般使用者 (並記錄)
                     isAdmin = false;
+					window.currentRole = 'user';
                     await setDoc(roleDocRef, { 
                         email: user.email, 
                         role: 'user',
@@ -600,74 +604,90 @@
                 console.error("Error checking user role:", e);
                 // 發生錯誤時，至少檢查是否為硬編碼管理者
                 isAdmin = (lowerCaseEmail === DEFAULT_ADMIN_EMAIL); 
+				window.currentRole = (lowerCaseEmail === DEFAULT_ADMIN_EMAIL) ? 'admin' : 'user';
             }
         }
 
-        /**
-         * 處理身份驗證狀態改變
-         */
-        function handleAuthStateChange(user) {
-            const authButton = document.getElementById('authButton');
-            const userEmailDisplay = document.getElementById('userEmailDisplay');
-            const adminPanelButton = document.getElementById('adminPanelButton');
+        /** * 處理身份驗證狀態改變 (已修正：改為 async 函數) */ 
+async function handleAuthStateChange(user) {
+    const authButton = document.getElementById('authButton');
+    const userEmailDisplay = document.getElementById('userEmailDisplay'); 
+    const adminPanelButton = document.getElementById('adminPanelButton'); 
+    const loginPanel = document.getElementById('login-panel');
+    const mainPanel = document.getElementById('main-panel');
+    
+    currentUser = user; 
+    
+    if (user) { 
+        window.userId = user.uid;
+        // 修正 user.email 可能為 null 的問題
+        window.userEmail = user.email || '未提供 Email'; 
+        
+        showStatus('', 'info', 'authStatus'); 
+        document.getElementById('loadingIndicator').classList.remove('hidden');
+        
+        try {
+            // 【關鍵修正：使用 await 確保角色資訊 (isAdmin, currentRole) 完全載入】
+            await checkUserRole(user); 
+
+            // 確保全域角色變數存在，以便其他函數可以立即使用
+            const roleDisplay = window.currentRole ? `（${window.currentRole} 身份）` : (window.isAdmin ? '（管理者身份）' : '（一般用戶身份）');
+            showStatus(`🟢 登入成功：${window.userEmail} ${roleDisplay}`, 'success', 'historyStatus');
+
+            // 更新 UI 狀態 
+            authButton.textContent = '登出'; 
+            authButton.onclick = googleSignOut; 
             
-            currentUser = user;
+            userEmailDisplay.innerHTML = `**${window.userEmail}** ${window.isAdmin ? '(管理者)' : (window.currentRole ? `(${window.currentRole})` : '')}`;
             
-            if (user) {
-                userId = user.uid;
-                // 修正 user.email 可能為 null 的問題，並確保用於顯示
-                userEmail = user.email || '未提供 Email'; 
-                
-                // 清除登入錯誤提示
-                showStatus('', 'info', 'authStatus');
+            // 隱藏登入面板，顯示主應用程式內容
+            if (loginPanel) loginPanel.classList.add('hidden');
+            if (mainPanel) mainPanel.classList.remove('hidden');
+            document.getElementById('checklistForm').classList.remove('hidden'); 
 
-                document.getElementById('loadingIndicator').classList.remove('hidden');
-
-                // 檢查角色
-                checkUserRole(user).then(() => {
-                    // 更新 UI 狀態
-                    authButton.textContent = '登出';
-                    authButton.onclick = googleSignOut;
-                    
-                    // 修正 userEmail 顯示 null 的問題
-                    userEmailDisplay.innerHTML = `**${userEmail}** (${isAdmin ? '管理者' : '一般用戶'})`;
-                    document.getElementById('checklistForm').classList.remove('hidden');
-                    
-                    
-                    document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false);
-
-                    if (isAdmin) {
-                        adminPanelButton.classList.remove('hidden');
-                        adminPanelButton.onclick = openAdminPanel;
-                    } else {
-                         adminPanelButton.classList.add('hidden');
-                    }
-                    
-                    loadChecklists(); // 登入後載入資料
-                    document.getElementById('loadingIndicator').classList.add('hidden');
-
-                }).catch(e => {
-                    console.error("Role check failed:", e);
-                    showStatus(`角色檢查失敗: ${e.message}。請檢查 Firestore 規則。`, 'error');
-                    document.getElementById('loadingIndicator').classList.add('hidden');
-                });
-
-            } else {
-                // 未登入狀態
-                userId = null;
-                userEmail = null;
-                isAdmin = false;
-                authButton.textContent = '登入 Google';
-                authButton.onclick = googleSignIn;
-                userEmailDisplay.innerHTML = '請登入 Google';
-                document.getElementById('checklistForm').classList.add('hidden');
-                document.getElementById('historyTableContainer').innerHTML = '<p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>';
-                document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true);
-                adminPanelButton.classList.add('hidden');
-                document.getElementById('loadingIndicator').classList.add('hidden');
-                showStatus("您已登出。", 'info');
-            }
+            document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false); 
+            
+            if (window.isAdmin) { 
+                adminPanelButton.classList.remove('hidden'); 
+                adminPanelButton.onclick = openAdminPanel; 
+            } else { 
+                adminPanelButton.classList.add('hidden'); 
+            } 
+            
+            loadChecklists(); // 角色確定後才載入資料
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            
+        } catch (e) {
+            console.error("Role check failed:", e); 
+            showStatus(`角色檢查失敗: ${e.message}。正在嘗試登出重置狀態。`, 'error'); 
+            document.getElementById('loadingIndicator').classList.add('hidden'); 
+            // 發生錯誤時，強制進入登出流程，確保狀態一致
+            googleSignOut();
         }
+
+    } else { 
+        // 未登入狀態
+        window.userId = null; 
+        window.userEmail = null; 
+        window.isAdmin = false;
+        window.currentRole = 'user'; // 重置角色
+        
+        authButton.textContent = '登入 Google';
+        authButton.onclick = googleSignIn; 
+        userEmailDisplay.innerHTML = '請登入 Google'; 
+        
+        // 隱藏主面板，顯示登入面板
+        if (mainPanel) mainPanel.classList.add('hidden');
+        if (loginPanel) loginPanel.classList.remove('hidden');
+        document.getElementById('checklistForm').classList.add('hidden'); 
+        
+        document.getElementById('historyTableContainer').innerHTML = '<p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>';
+        document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true); 
+        adminPanelButton.classList.add('hidden'); 
+        document.getElementById('loadingIndicator').classList.add('hidden'); 
+        showStatus("您已登出。", 'info');
+    }
+}
         
         // --- 表單流程控制 ---
 
@@ -1250,6 +1270,7 @@ if (isCreator) {
     </script>
 </body>
 </html>
+
 
 
 
