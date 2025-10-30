@@ -75,7 +75,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
-            getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged 
+            getAuth, GoogleAuthProvider, signOut, onAuthStateChanged, 
+            signInWithRedirect, getRedirectResult // 新增 Redirect 相關功能
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc, query, orderBy
@@ -161,6 +162,31 @@
                 userRole = 'user'; 
             }
         }
+        
+        /**
+         * 處理登入重定向結果 (Handle Redirect Result)
+         */
+        async function handleRedirectResult() {
+            try {
+                // 嘗試獲取從 Google 重定向回來的登入結果
+                const result = await getRedirectResult(auth);
+                if (result) {
+                    // 如果有結果，onAuthStateChanged 會在接下來被觸發
+                    console.log('Redirect Sign-In Result Received:', result.user.email);
+                    showToast('Google 登入成功！頁面將自動更新。', 'success');
+                }
+            } catch (error) {
+                console.error("處理重定向結果失敗:", error);
+                document.getElementById('auth-error').innerHTML = `
+                    <span class="font-bold">❌ 登入失敗:</span> Firebase Error (${error.code || error.message}). 
+                    <br>
+                    <span class="text-yellow-100">
+                    若問題持續，請檢查瀏覽器的追蹤保護或 Firebase 專案設定中的 Authorized domains。
+                    </span>
+                `;
+                document.getElementById('auth-error').classList.remove('hidden');
+            }
+        }
 
         /**
          * 處理 Firebase 驗證狀態變更
@@ -168,6 +194,11 @@
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
             
+            // 處理重定向結果：必須在 onAuthStateChanged 監聽器中執行，以捕捉首次載入頁面時的狀態
+            if (!isAuthReady) {
+                await handleRedirectResult();
+            }
+
             if (user) {
                 await checkUserRole(user.uid, user.email || 'N/A');
                 
@@ -194,25 +225,24 @@
         });
 
         /**
-         * 觸發 Google 登入
+         * 觸發 Google 登入 (使用 Redirect 方式)
          */
         window.signInWithGoogle = async () => {
+            console.log('--- Attempting Google Sign-In (Redirect Method) ---');
             const provider = new GoogleAuthProvider();
             try {
-                // 嘗試開啟彈出視窗登入
-                await signInWithPopup(auth, provider);
-                document.getElementById('auth-error').classList.add('hidden');
+                // 使用 Redirect 方式登入，以繞過彈出視窗阻擋器
+                await signInWithRedirect(auth, provider);
+                // 執行到這裡會觸發頁面跳轉
             } catch (error) {
                 console.error("Google 登入失敗:", error);
                 
-                // 強化錯誤訊息，提示用戶檢查彈出視窗阻擋器
+                // 強化錯誤訊息
                 document.getElementById('auth-error').innerHTML = `
                     <span class="font-bold">❌ Google 登入失敗:</span> Firebase Error (${error.code || error.message}). 
                     <br>
                     <span class="text-yellow-100">
-                    若登入按鈕點擊無反應，請檢查瀏覽器是否阻擋了彈出視窗 
-                    <span class="font-extrabold">(Popup Blocker)</span> 
-                    或 Firebase 專案設定中的 Authorized domains。
+                    如果頁面沒有跳轉，請檢查瀏覽器 Console 輸出，或確認 Firebase Authorized domains 設定。
                     </span>
                 `;
                 document.getElementById('auth-error').classList.remove('hidden');
@@ -829,7 +859,7 @@
             <h1 class="text-3xl font-bold mb-2 sm:mb-0">廣告預算核對雙簽表</h1>
             <div class="flex items-center space-x-3">
                 <span id="auth-status" class="text-sm italic">請登入</span>
-                <!-- 登入按鈕修正為顯示狀態 -->
+                <!-- 登入按鈕 -->
                 <button id="login-button" onclick="signInWithGoogle()" 
                         class="bg-white text-indigo-600 px-4 py-2 rounded-full font-semibold shadow-md hover:bg-gray-100 transition duration-150">
                     登入 Google
