@@ -1272,6 +1272,8 @@ function displayChecklistHistory() {
             }
             
             // 設定登入/登出監聽器
+			// 【新增：在此處呼叫初始化函數，確保篩選器監聽器在頁面載入時綁定】
+		///	initFilterListeners(); <--- 請新增此行
             onAuthStateChanged(auth, handleAuthStateChange);
             
             // 表單事件
@@ -1360,6 +1362,7 @@ function displayChecklistHistory() {
     </script>
 </body>
 </html>
+
 
 
 
