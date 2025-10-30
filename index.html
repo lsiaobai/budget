@@ -476,7 +476,7 @@
         
         // --- 應用程式狀態 ---
         let app, db, auth;
-       // let currentUser = null; // Firebase User Object //
+        let currentUser = null; // Firebase User Object
         let userId = null;
         let userEmail = null;
         let isAdmin = false;
@@ -554,7 +554,6 @@
         async function checkUserRole(user) {
             if (!db || !user) {
                 isAdmin = false;
-				currentRole = 'user'; // 發生錯誤或未登入時，預設為普通用戶
                 return;
             }
             
@@ -571,7 +570,6 @@
                 // 1. 檢查是否為預設管理者 (硬編碼)
                 if (lowerCaseEmail === DEFAULT_ADMIN_EMAIL) {
                     isAdmin = true;
-					window.currentRole = 'admin';
                     // 確保預設管理者在 user_roles 中有記錄且角色正確
                     if (!foundRole || foundRole.role !== 'admin' || foundRole.email.toLowerCase() !== lowerCaseEmail) {
                         await setDoc(roleDocRef, { 
@@ -583,7 +581,6 @@
                 } else if (foundRole) {
                     // 2. 檢查是否有已設定的角色
                     isAdmin = foundRole.role === 'admin';
-					window.currentRole = foundRole.role;
                     // 更新登入時間
                      await setDoc(roleDocRef, { 
                         lastLogin: serverTimestamp() 
@@ -591,7 +588,6 @@
                 } else {
                     // 3. 預設為一般使用者 (並記錄)
                     isAdmin = false;
-					window.currentRole = 'user';
                     await setDoc(roleDocRef, { 
                         email: user.email, 
                         role: 'user',
@@ -604,90 +600,74 @@
                 console.error("Error checking user role:", e);
                 // 發生錯誤時，至少檢查是否為硬編碼管理者
                 isAdmin = (lowerCaseEmail === DEFAULT_ADMIN_EMAIL); 
-				window.currentRole = (lowerCaseEmail === DEFAULT_ADMIN_EMAIL) ? 'admin' : 'user';
             }
         }
 
-/** * 處理身份驗證狀態改變 (已修正：改為 async 函數並強制等待角色載入，直接設定全域變數) */ 
-async function handleAuthStateChange(user) {
-    const authButton = document.getElementById('authButton');
-    const userEmailDisplay = document.getElementById('userEmailDisplay'); 
-    const adminPanelButton = document.getElementById('adminPanelButton'); 
-    const loginPanel = document.getElementById('login-panel');
-    const mainPanel = document.getElementById('main-panel');
-    
-    // 【關鍵修正：直接賦值給全域變數 userId 和 userEmail (沒有 window. 前綴)】
-    userId = user ? user.uid : null;
-    userEmail = user ? (user.email || '未提供 Email') : null;
-    
-    // 請確認您已經移除頂部的 let currentUser = null; 宣告
-    // 並且已經移除 handleAuthStateChange 函數開頭的 currentUser = user; 賦值
-    
-    if (user) { 
-        showStatus('', 'info', 'authStatus'); 
-        document.getElementById('loadingIndicator').classList.remove('hidden');
-        
-        try {
-            // 由於 userId 和 userEmail 已設定，這裡可以安全地執行 await
-            await checkUserRole(user); 
-            // checkUserRole 函數內部需要確保它也直接設定全域的 isAdmin 和 currentRole
+        /**
+         * 處理身份驗證狀態改變
+         */
+        function handleAuthStateChange(user) {
+            const authButton = document.getElementById('authButton');
+            const userEmailDisplay = document.getElementById('userEmailDisplay');
+            const adminPanelButton = document.getElementById('adminPanelButton');
             
-            // 顯示狀態
-            const roleDisplay = currentRole ? `（${currentRole} 身份）` : (isAdmin ? '（管理者身份）' : '（一般用戶身份）');
-            showStatus(`🟢 登入成功：${userEmail} ${roleDisplay}`, 'success', 'historyStatus');
+            currentUser = user;
+            
+            if (user) {
+                userId = user.uid;
+                // 修正 user.email 可能為 null 的問題，並確保用於顯示
+                userEmail = user.email || '未提供 Email'; 
+                
+                // 清除登入錯誤提示
+                showStatus('', 'info', 'authStatus');
 
-            // 更新 UI 狀態 
-            authButton.textContent = '登出'; 
-            authButton.onclick = googleSignOut; 
-            
-            userEmailDisplay.innerHTML = `**${userEmail}** ${isAdmin ? '(管理者)' : (currentRole ? `(${currentRole})` : '')}`;
-            
-            // 隱藏登入面板，顯示主應用程式內容
-            if (loginPanel) loginPanel.classList.add('hidden');
-            if (mainPanel) mainPanel.classList.remove('hidden');
-            document.getElementById('checklistForm').classList.remove('hidden'); 
+                document.getElementById('loadingIndicator').classList.remove('hidden');
 
-            // 啟用所有按鈕
-            document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false); 
-            
-            if (isAdmin) { 
-                adminPanelButton.classList.remove('hidden'); 
-                adminPanelButton.onclick = openAdminPanel; 
-            } else { 
-                adminPanelButton.classList.add('hidden'); 
-            } 
-            
-            // 載入歷史記錄
-            loadChecklists(); 
-            document.getElementById('loadingIndicator').classList.add('hidden');
-            
-        } catch (e) {
-            console.error("Role check failed:", e); 
-            showStatus(`角色檢查失敗: ${e.message}。請嘗試重新整理。`, 'error'); 
-            document.getElementById('loadingIndicator').classList.add('hidden'); 
+                // 檢查角色
+                checkUserRole(user).then(() => {
+                    // 更新 UI 狀態
+                    authButton.textContent = '登出';
+                    authButton.onclick = googleSignOut;
+                    
+                    // 修正 userEmail 顯示 null 的問題
+                    userEmailDisplay.innerHTML = `**${userEmail}** (${isAdmin ? '管理者' : '一般用戶'})`;
+                    document.getElementById('checklistForm').classList.remove('hidden');
+                    
+                    
+                    document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false);
+
+                    if (isAdmin) {
+                        adminPanelButton.classList.remove('hidden');
+                        adminPanelButton.onclick = openAdminPanel;
+                    } else {
+                         adminPanelButton.classList.add('hidden');
+                    }
+                    
+                    loadChecklists(); // 登入後載入資料
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+
+                }).catch(e => {
+                    console.error("Role check failed:", e);
+                    showStatus(`角色檢查失敗: ${e.message}。請檢查 Firestore 規則。`, 'error');
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+                });
+
+            } else {
+                // 未登入狀態
+                userId = null;
+                userEmail = null;
+                isAdmin = false;
+                authButton.textContent = '登入 Google';
+                authButton.onclick = googleSignIn;
+                userEmailDisplay.innerHTML = '請登入 Google';
+                document.getElementById('checklistForm').classList.add('hidden');
+                document.getElementById('historyTableContainer').innerHTML = '<p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>';
+                document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true);
+                adminPanelButton.classList.add('hidden');
+                document.getElementById('loadingIndicator').classList.add('hidden');
+                showStatus("您已登出。", 'info');
+            }
         }
-
-    } else { 
-        // 未登入狀態
-        isAdmin = false;
-        currentRole = 'user'; // 重置角色
-        
-        authButton.textContent = '登入 Google';
-        authButton.onclick = googleSignIn; 
-        userEmailDisplay.innerHTML = '請登入 Google'; 
-        
-        // 隱藏主面板，顯示登入面板
-        if (mainPanel) mainPanel.classList.add('hidden');
-        if (loginPanel) loginPanel.classList.remove('hidden');
-        document.getElementById('checklistForm').classList.add('hidden'); 
-        
-        document.getElementById('historyTableContainer').innerHTML = '<p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>';
-        document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true); 
-        adminPanelButton.classList.add('hidden'); 
-        document.getElementById('loadingIndicator').classList.add('hidden'); 
-        showStatus("您已登出。", 'info');
-    }
-}
         
         // --- 表單流程控制 ---
 
@@ -968,29 +948,20 @@ async function handleAuthStateChange(user) {
                 const statusClass = item.result === 'pass' ? 'text-green-600 bg-green-50' : (item.result === 'fail' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50');
                 const statusText = item.result === 'pass' ? '✅ 通過' : (item.result === 'fail' ? '❌ 不通過' : '⚪ 待檢核');
                 
-// 判斷操作按鈕
-const isCreator = item.createdByUserId === userId;
-const currentRole = getRole(); // 獲取當前用戶的角色
-let actionButton;
+                // 判斷操作按鈕
+                const isCreator = item.createdByUserId === userId;
+                let actionButton;
 
-if (isCreator) {
-    // 建立者 (Creator) 只能修改自己的，且狀態必須是待執行 (Firestore 規則限制)
-    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_executor')" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">修改</button>`;
-
-} else if (currentRole === 'reviewer') {
-    // 【✅ 修正邏輯：檢核人 (Reviewer) 可以對非自己建立的記錄執行檢核或修改】
-    
-    // 無論狀態是 '待執行', 'pass', 或 'fail'，一律顯示檢核按鈕 (因為規則已放寬)
-    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_reviewer')" class="text-green-600 hover:text-green-900 font-medium mr-3">檢核</button>`;
-
-} else if (currentRole === 'user' && item.result !== 'pass' && item.result !== 'fail') {
-    // 普通用戶 (User) 只能看到待檢核狀態，但不能點擊
-    actionButton = `<span class="text-gray-500">待檢核</span>`;
-
-} else {
-    // 其他情況（已完成的記錄對普通用戶或無法操作的人）
-    actionButton = `<span class="text-gray-500">已完成</span>`;
-}
+                if (isCreator) {
+                    // Creator can always edit their own executor fields
+                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_executor')" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">修改</button>`;
+                } else if (item.result !== 'pass' && item.result !== 'fail') {
+                    // Others (Reviewer) can review if the result is pending
+                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_reviewer')" class="text-green-600 hover:text-green-900 font-medium mr-3">檢核</button>`;
+                } else {
+                    // Everyone can view completed records (no action needed)
+                    actionButton = `<span class="text-gray-500">已完成</span>`;
+                }
 
                 // Admin only delete button
                 let deleteButton = '';
@@ -1270,12 +1241,6 @@ if (isCreator) {
     </script>
 </body>
 </html>
-
-
-
-
-
-
 
 
 
