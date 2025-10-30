@@ -328,6 +328,35 @@
         <!-- 歷史記錄區塊 -->
         <div id="historySection" class="p-6 sm:p-8 bg-gray-100 border-t border-gray-300 mt-4">
             <h2 class="text-xl font-bold text-gray-800 mb-4">歷史核對記錄</h2>
+			<div id="filter-container" class="mb-6 flex flex-wrap gap-4 items-end p-4 border border-gray-200 rounded-xl bg-gray-50">
+        <div class="flex flex-col w-full sm:w-auto">
+            <label for="filter-executor" class="text-sm font-medium text-gray-700 mb-1">執行者篩選</label>
+            <select id="filter-executor" onchange="handleFilterChange(event)" data-filter-key="executor" class="p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 bg-white min-w-[150px]">
+                <option value="all">所有執行者</option>
+            </select>
+        </div>
+        
+        <div class="flex flex-col w-full sm:w-auto">
+            <label for="filter-reviewer" class="text-sm font-medium text-gray-700 mb-1">檢核者篩選</label>
+            <select id="filter-reviewer" onchange="handleFilterChange(event)" data-filter-key="reviewer" class="p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 bg-white min-w-[150px]">
+                <option value="all">所有檢核者</option>
+            </select>
+        </div>
+        
+        <div class="flex flex-col w-full sm:w-auto">
+            <label for="filter-result" class="text-sm font-medium text-gray-700 mb-1">簽核結果篩選</label>
+            <select id="filter-result" onchange="handleFilterChange(event)" data-filter-key="result" class="p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 bg-white min-w-[150px]">
+                <option value="all">所有結果</option>
+                <option value="待執行">待執行</option>
+                <option value="pass">通過</option>
+                <option value="fail">不通過</option>
+            </select>
+        </div>
+
+        <button onclick="clearFilters()" class="w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition duration-150 font-medium">
+            清除篩選
+        </button>
+    </div>
             <div id="historyTableContainer" class="overflow-x-auto">
                 <p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>
             </div>
@@ -483,7 +512,11 @@
         let checklistData = []; 
         let editingId = null; 
         let editMode = 'new'; // 'new', 'edit_executor', 'edit_reviewer'
-
+		let currentFilters = {
+    executor: 'all',
+    reviewer: 'all',
+    result: 'all'
+};
         // --- Firestore 路徑 ---
         const CHECKLIST_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/budget_checklists`;
         const USER_ROLES_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/user_roles`;
@@ -524,7 +557,68 @@
         }
         
         // --- 驗證與權限核心邏輯 ---
+// 【新增：處理篩選器變更的函數】
+function handleFilterChange(event) {
+    const key = event.target.getAttribute('data-filter-key');
+    const value = event.target.value;
+    
+    currentFilters[key] = value;
+    
+    // 重新渲染表格，應用新的篩選條件
+    displayChecklistHistory(); 
+}
 
+// 【新增：清除所有篩選器的函數】
+function clearFilters() {
+    currentFilters = {
+        executor: 'all',
+        reviewer: 'all',
+        result: 'all'
+    };
+    
+    // 重設 HTML 選擇器的值
+    // 請確保您的 HTML 元素 ID 與這裡一致
+    document.getElementById('filter-executor').value = 'all';
+    document.getElementById('filter-reviewer').value = 'all';
+    document.getElementById('filter-result').value = 'all';
+    
+    // 重新渲染表格 (它會應用 currentFilters)
+    displayChecklistHistory(); 
+}
+
+// 【新增：填充篩選器選項的函數】
+function populateFilterOptions() {
+    // 檢查元素是否存在
+    const executorSelect = document.getElementById('filter-executor');
+    const reviewerSelect = document.getElementById('filter-reviewer');
+    if (!executorSelect || !reviewerSelect) return; 
+
+    // 收集所有唯一的執行者 Email 和檢核者 Name
+    // 必須使用 Set 確保唯一性
+    const uniqueExecutors = new Set(checklistData.map(item => item.creatorEmail).filter(e => e));
+    const uniqueReviewers = new Set(checklistData.map(item => item.reviewer).filter(r => r));
+
+    // 清空舊選項 (保留 '所有...' 選項)
+    executorSelect.innerHTML = '<option value="all">所有執行者</option>';
+    reviewerSelect.innerHTML = '<option value="all">所有檢核者</option>';
+
+    // 填充執行者選項
+    uniqueExecutors.forEach(email => {
+        // 使用 email 作為 value 和顯示文本
+        executorSelect.innerHTML += `<option value="${email}">${email}</option>`;
+    });
+
+    // 填充檢核者選項
+    uniqueReviewers.forEach(name => {
+        // 使用 reviewer name 作為 value 和顯示文本
+        reviewerSelect.innerHTML += `<option value="${name}">${name}</option>`;
+    });
+    
+    // 重設篩選器為當前值
+    executorSelect.value = currentFilters.executor;
+    reviewerSelect.value = currentFilters.reviewer;
+    document.getElementById('filter-result').value = currentFilters.result;
+}
         async function googleSignIn() {
             const provider = new GoogleAuthProvider();
             try {
@@ -854,7 +948,8 @@
                 }); 
 
                 showStatus(`💾 已載入 ${checklistData.length} 筆歷史核對記錄。`, 'info', 'historyStatus');
-                renderHistoryTable(); 
+            	populateFilterOptions(); // <--- 新增此行
+                displayChecklistHistory(); // <--- 請將您的 renderHistoryTable() 替換為 displayChecklistHistory()
             }, (error) => {
                 console.error("Error listening to collection: ", error);
                 showStatus(`❌ 載入歷史記錄失敗: ${error.message}。請檢查 Firestore 規則是否允許讀取。`, 'error', 'historyStatus');
@@ -920,85 +1015,109 @@
             document.getElementById('calculatedResult').classList.remove('text-red-600', 'text-green-700');
         }
 
-        // Render the history table
-        function renderHistoryTable() {
-            const container = document.getElementById('historyTableContainer');
-            if (checklistData.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 p-4 text-center">目前沒有歷史核對記錄。</p>';
-                return;
-            }
+        // 【完整替換：包含篩選邏輯和表格渲染】
+function displayChecklistHistory() {
+    const tableContainer = document.getElementById('historyTableContainer');
+    // 如果表格容器不存在，則結束
+    if (!tableContainer) return;
+    
+    // 1. 執行篩選
+    let filteredData = checklistData.filter(item => {
+        // 執行者篩選 (使用 creatorEmail)
+        const executorMatch = currentFilters.executor === 'all' || 
+                              item.creatorEmail === currentFilters.executor;
 
-            let html = `
-                <table class="w-full text-sm text-left text-gray-700 bg-white shadow-md rounded-lg overflow-hidden">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3">帳號/客戶名稱</th>
-                            <th scope="col" class="px-6 py-3">執行人</th> 
-                            <th scope="col" class="px-6 py-3">檢核人</th>
-                            <th scope="col" class="px-6 py-3">結果</th>
-                            <th scope="col" class="px-6 py-3">最後執行時間</th>
-                            <th scope="col" class="px-6 py-3">最後檢核時間</th>
-                            <th scope="col" class="px-6 py-3">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
+        // 檢核者篩選 (使用 reviewer 姓名)
+        const reviewerMatch = currentFilters.reviewer === 'all' || 
+                              item.reviewer === currentFilters.reviewer;
 
-            checklistData.forEach(item => {
-                const statusClass = item.result === 'pass' ? 'text-green-600 bg-green-50' : (item.result === 'fail' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50');
-                const statusText = item.result === 'pass' ? '✅ 通過' : (item.result === 'fail' ? '❌ 不通過' : '⚪ 待檢核');
-                
-                // 判斷操作按鈕
-                const isCreator = item.createdByUserId === userId;
-                let actionButton;
+        // 結果篩選 (使用 HTML option 的 value: pass/fail/待執行)
+        const itemResultValue = item.result || '待執行'; // 確保未填寫時是 '待執行'
 
-                if (isCreator) {
-                    // Creator can always edit their own executor fields
-                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_executor')" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">修改</button>`;
-                } else if (item.result !== 'pass' && item.result !== 'fail') {
-                    // Others (Reviewer) can review if the result is pending
-                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_reviewer')" class="text-green-600 hover:text-green-900 font-medium mr-3">檢核</button>`;
-                } else {
-                    // Everyone can view completed records (no action needed)
-                    actionButton = `<span class="text-gray-500">已完成</span>`;
-                }
+        const resultMatch = currentFilters.result === 'all' || 
+                            currentFilters.result === itemResultValue; // 使用 pass/fail/待執行 進行匹配
 
-                // Admin only delete button
-                let deleteButton = '';
-                if (isAdmin) {
-                    deleteButton = `<button onclick="window.deleteChecklist('${item.id}')" class="text-red-600 hover:text-red-900 font-medium ml-3">刪除</button>`;
-                }
+        return executorMatch && reviewerMatch && resultMatch;
+    });
+    
+    // 如果篩選結果為空
+    if (filteredData.length === 0) {
+        tableContainer.innerHTML = '<p class="text-gray-500 p-4 text-center">沒有符合篩選條件的記錄。</p>';
+        return;
+    }
+    
+    // 2. 準備表格 HTML
+    let tableHtml = `
+        <table class="checklist-table w-full border-collapse rounded-xl overflow-hidden shadow-lg">
+            <thead>
+                <tr>
+                    <th class="w-[5%]">ID</th>
+                    <th class="w-[10%]">建立日期</th>
+                    <th class="w-[15%]">客戶名稱</th>
+                    <th class="w-[15%]">執行人 (Creator)</th>
+                    <th class="w-[15%]">核對人 (Reviewer)</th>
+                    <th class="w-[10%]">結果</th>
+                    <th class="w-[20%]">動作</th>
+                    <th class="w-[10%]">細節</th>
+                </tr>
+            </thead>
+            <tbody id="checklist-table-body">
+    `;
 
+    // 3. 迴圈渲染篩選後的數據
+    filteredData.forEach(item => {
+        
+        const isCreator = item.createdByUserId === userId;
+        const isAdminOrCreator = isAdmin || isCreator;
+        const statusClass = item.result === 'pass' ? 'bg-green-100 text-green-700' : 
+                            item.result === 'fail' ? 'bg-red-100 text-red-700' : 
+                            'bg-blue-100 text-blue-700';
+        const resultText = item.result === 'pass' ? '✅ 通過' : 
+                           item.result === 'fail' ? '❌ 不通過' : 
+                           '📝 待執行';
 
-                html += `
-                    <tr class="bg-white border-b hover:bg-gray-50">
-                        <td class="px-6 py-4 font-medium text-gray-900">
-                            ${item.clientName}<br>
-                            <span class="text-xs text-gray-500">${item.accountNameId || 'N/A'}</span>
-                        </td>
-                        <td class="px-6 py-4 font-medium text-gray-900">${item.executor || 'N/A'}</td>
-                        <td class="px-6 py-4 font-medium text-gray-900">${item.reviewer || 'N/A'}</td> 
-                        <td class="px-6 py-4">
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded ${statusClass}">
-                                ${statusText}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-xs">${item.executionTimestampDisplay}</td>
-                        <td class="px-6 py-4 text-xs">${item.reviewTimestampDisplay}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            ${actionButton}
-                            ${deleteButton}
-                        </td>
-                    </tr>
+        let actionButton;
+        if (item.result === '待執行' || !item.result) { // 處理 result 為空或 '待執行' 的情況
+            if (isCreator) {
+                // 執行者：可以編輯或刪除自己的待執行記錄
+                actionButton = `
+                    <button onclick="startEditOrReview('${item.id}', 'edit_executor')" class="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150 mr-2">編輯</button>
+                    <button onclick="deleteChecklist('${item.id}')" class="bg-red-500 hover:bg-red-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">刪除</button>
                 `;
-            });
-
-            html += `
-                    </tbody>
-                </table>
-            `;
-            container.innerHTML = html;
+            } else if (isAdmin || item.reviewer === 'N/A' || item.reviewerId === userId) {
+                // 管理者或未被指定核對人或已被指定為核對人：可以進行核對
+                actionButton = `<button onclick="startEditOrReview('${item.id}', 'edit_reviewer')" class="bg-green-500 hover:bg-green-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">進行核對</button>`;
+            } else {
+                actionButton = '<span class="text-gray-500 text-xs">等待處理...</span>';
+            }
+        } else {
+            // 已完成簽核的記錄 (pass/fail)，只有管理員可以刪除
+            actionButton = isAdmin ? 
+                `<button onclick="deleteChecklist('${item.id}')" class="bg-red-500 hover:bg-red-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">刪除 (Admin)</button>` :
+                '<span class="text-gray-500 text-xs">已完成</span>';
         }
+
+        tableHtml += `
+            <tr id="row-${item.id}">
+                <td class="text-gray-500 text-xs">${item.id.substring(0, 4)}...</td>
+                <td class="text-sm">${item.date}</td>
+                <td class="font-medium text-gray-700">${item.clientName}</td>
+                <td>${item.executor} (${item.creatorEmail || 'N/A'})</td>
+                <td>${item.reviewer || 'N/A'}</td>
+                <td><span class="inline-block px-3 py-1 text-xs font-semibold rounded-full ${statusClass}">${resultText}</span></td>
+                <td>${actionButton}</td>
+                <td><button onclick="showDetailModal('${item.id}')" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">查看</button></td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+    
+    tableContainer.innerHTML = tableHtml;
+}
         
         // --- 管理員後台功能 ---
 
@@ -1241,6 +1360,7 @@
     </script>
 </body>
 </html>
+
 
 
 
