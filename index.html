@@ -434,449 +434,796 @@
     </script>
     
     <!-- FIREBASE 核心功能 (驗證, 儲存, 權限控管) -->
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { 
-        getFirestore, 
-        collection, 
-        addDoc, 
-        serverTimestamp,
-        doc,
-        setDoc,
-        deleteDoc,
-        getDocs,
-        setLogLevel,
-        query,
-        orderBy,
-        getDoc, 
-        updateDoc, 
-        Timestamp,
-    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    
-    // 設定 Firebase Debug Log
-    setLogLevel('Debug');
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            onSnapshot, 
+            serverTimestamp,
+            doc,
+            setDoc,
+            deleteDoc,
+            getDocs,
+            setLogLevel,
+            query,
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // 設定 Firebase Debug Log
+        setLogLevel('Debug');
 
-    // --------------------------------------------------
-    // 1. 請在這裡填寫您的 Firebase 設定物件 (重要!)
-    // --------------------------------------------------
-    const firebaseConfig = {
+        // --- FIREBASE CONFIGURATION ---
+        // 請注意：這裡的配置應來自您的 Firebase 專案設定
+        const userFirebaseConfig = {
             apiKey: "AIzaSyB7GaY2z3mKeD3bd9r_KVcd_VYMzz42c7c", 
             authDomain: "budgetcheck-7a2e9.firebaseapp.com",
             projectId: "budgetcheck-7a2e9",
             storageBucket: "budgetcheck-7a2e9.firebasestorage.app", 
             messagingSenderId: "1084663157523", 
             appId: "1:1084663157523:web:4e8160c5c3da30f92380e6", 
-            measurementId: "G-81VM0XN7VC"
-    }; 
-    // --------------------------------------------------
-    
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+            measurementId: "G-81VM0XN7VC" 
+        };
+        // --- END CONFIGURATION ---
 
-    let currentUserId = null;
-    let currentUserEmail = null;
-    let isAdminUser = false;
-    let allChecklistData = []; 
-
-    // 輔助函數：格式化時間戳
-    function formatTimestamp(timestamp) {
-        if (!timestamp) return 'N/A';
-        const date = timestamp instanceof Timestamp 
-                    ? timestamp.toDate() 
-                    : new Date(timestamp);
+        // Global Firebase variables: 優先使用 Canvas 提供的設定，如果沒有則使用自定義設定
+        const canvasFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const canvasAppId = typeof __app_id !== 'undefined' ? __app_id : null;
         
-        if (isNaN(date)) return 'N/A';
+        const configToUse = canvasFirebaseConfig || userFirebaseConfig;
+        const finalAppId = canvasAppId || userFirebaseConfig.projectId || 'default-external-app-id';
         
-        return date.toLocaleDateString('zh-TW', {
-            year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-        }).replace(/\//g, '-');
-    }
+        // --- 應用程式狀態 ---
+        let app, db, auth;
+        let currentUser = null; // Firebase User Object
+        let userId = null;
+        let userEmail = null;
+        let isAdmin = false;
+        let checklistData = []; 
+        let editingId = null; 
+        let editMode = 'new'; // 'new', 'edit_executor', 'edit_reviewer'
 
-    // =================================================================
-    // 2. 資料載入函數 (時序修復)
-    // =================================================================
-
-    function loadHistoryChecklists() {
-        const collectionRef = collection(doc(db, "public", "data"), "budget_checklists");
+        // --- Firestore 路徑 ---
+        const CHECKLIST_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/budget_checklists`;
+        const USER_ROLES_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/user_roles`;
         
-        document.getElementById("historyMessage").innerText = "正在載入歷史記錄..."; 
+        // --- 管理者硬編碼郵箱 (預設管理者) ---
+        // 確保使用小寫進行穩定的比較
+        const DEFAULT_ADMIN_EMAIL = "lsiaobai@gmail.com".toLowerCase(); 
 
-        const q = query(collectionRef, orderBy("executionTimestamp", "desc"));
-        getDocs(q)
-            .then(querySnapshot => {
-                document.getElementById("historyMessage").innerText = ""; 
-                displayHistoryChecklists(querySnapshot);
-            })
-            .catch(error => {
-                document.getElementById("historyMessage").innerText = `❌ 載入歷史記錄失敗: ${error.message}。請檢查 Firestore 規則是否允許讀取。`;
-                console.error("載入歷史記錄失敗:", error);
-            });
-    }
-
-    function loadUserRoles() {
-        const collectionRef = collection(doc(db, "public", "data"), "user_roles");
-        
-        document.getElementById("userListMessage").innerText = "正在載入用戶列表..."; 
-        
-        getDocs(collectionRef)
-            .then(querySnapshot => {
-                document.getElementById("userListMessage").innerText = ""; 
-                displayUserList(querySnapshot);
-            })
-            .catch(error => {
-                document.getElementById("userListMessage").innerText = `❌ 載入用戶列表失敗: ${error.message}`;
-                console.error("載入用戶列表失敗:", error);
-            });
-    }
-
-
-    // =================================================================
-    // 3. 歷史記錄相關函數 (V9 修復 + 公開)
-    // =================================================================
-
-    function displayHistoryChecklists(querySnapshot) {
-        const historyListBody = document.getElementById('historyListBody');
-        historyListBody.innerHTML = '';
-        allChecklistData = []; 
-
-        querySnapshot.forEach(doc => {
-            const data = doc.data();
-            data.id = doc.id;
-            data.executionTimestampDisplay = formatTimestamp(data.executionTimestamp);
-            data.reviewTimestampDisplay = formatTimestamp(data.reviewTimestamp);
-
-            allChecklistData.push(data);
-            displayRow(historyListBody, data);
-        });
-
-        document.getElementById('downloadCsvButton').style.display = allChecklistData.length > 0 ? 'inline-block' : 'none';
-    }
-
-    function displayRow(container, item) {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-gray-50';
-        
-        let resultText = '';
-        let resultClass = '';
-
-        if (item.result === 'Pass') {
-            resultText = '通過 (Pass)';
-            resultClass = 'bg-green-100 text-green-800';
-        } else if (item.result === 'Fail') {
-            resultText = '不通過 (Fail)';
-            resultClass = 'bg-red-100 text-red-800';
-        } else if (item.reviewer && !item.result) {
-            resultText = '檢核中';
-            resultClass = 'bg-yellow-100 text-yellow-800';
-        } else {
-            resultText = '待檢核';
-            resultClass = 'bg-gray-100 text-gray-800';
-        }
-
-        tr.innerHTML = `
-            <td class="whitespace-nowrap">${item.project || 'N/A'}</td>
-            <td class="whitespace-nowrap">${item.account || 'N/A'}</td>
-            <td class="whitespace-nowrap">${item.date || 'N/A'}</td>
-            <td class="whitespace-nowrap">${item.creatorEmail || 'N/A'}</td>
-            <td class="whitespace-nowrap">${item.reviewerEmail || 'N/A'}</td>
-            <td class="whitespace-nowrap"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${resultClass}">${resultText}</span></td>
-            <td class="whitespace-nowrap">${item.reviewTimestampDisplay}</td>
-            <td class="text-right">
-                ${createActionButton(item)}
-            </td>
-        `;
-        container.appendChild(tr);
-    }
-
-    function createActionButton(item) {
-        if (isAdminUser) {
-            // 注意：這裡呼叫的 deleteChecklist 會指向 window.deleteChecklist
-            return `<button onclick="deleteChecklist('${item.id}')" class="text-red-600 hover:text-red-900 ml-2">刪除</button>`;
-        } else if (!item.reviewerEmail && currentUserId === item.createdByUserId) {
-            return `<button onclick="editChecklist('${item.id}')" class="text-indigo-600 hover:text-indigo-900">編輯/重新送出</button>`;
-        } else if (!item.result && currentUserEmail === item.reviewerEmail) {
-            return `<button onclick="reviewChecklist('${item.id}')" class="text-green-600 hover:text-green-900">進行檢核</button>`;
-        } else if (item.result) {
-            return `<button onclick="viewChecklist('${item.id}')" class="text-gray-600 hover:text-gray-900">查看</button>`;
-        }
-        return '';
-    }
-
-    // 將函數掛載到 window，供 HTML 內聯事件調用
-    window.reviewChecklist = (id) => {
-        const item = allChecklistData.find(d => d.id === id);
-        if (!item) return;
-
-        const notes = prompt("請輸入檢核備註 (選填):");
-        if (notes === null) return; 
-
-        const result = confirm("請確認檢核結果：點擊『確定』表示通過 (Pass)，『取消』表示不通過 (Fail)") ? 'Pass' : 'Fail';
-
-        const docRef = doc(db, "public", "data", "budget_checklists", id);
-        updateDoc(docRef, {
-            result: result,
-            notes: notes,
-            reviewTimestamp: serverTimestamp(), 
-            reviewer: currentUserEmail
-        })
-        .then(() => {
-            alert("檢核結果已成功送出！");
-            loadHistoryChecklists(); 
-        })
-        .catch(error => {
-            alert("檢核送出失敗：" + error.message);
-            console.error("檢核送出失敗:", error);
-        });
-    }
-    
-    // 將函數掛載到 window，供 HTML 內聯事件調用
-    window.deleteChecklist = (id) => {
-        if (!isAdminUser) {
-            alert("您沒有權限執行刪除操作。");
-            return;
-        }
-        if (confirm("警告：您確定要永久刪除此筆記錄嗎？")) {
-            deleteDoc(doc(db, "public", "data", "budget_checklists", id))
-                .then(() => {
-                    alert("記錄已刪除。");
-                    loadHistoryChecklists(); 
-                })
-                .catch(error => {
-                    alert("刪除失敗：" + error.message);
-                    console.error("刪除失敗:", error);
-                });
-        }
-    }
-
-    // 將函數掛載到 window，供 HTML 內聯事件調用
-    window.downloadCSV = () => {
-        const header = [
-            'ID', '專案名稱', '廣告帳戶', '日期', '預算檢查', '執行人', '檢核人', 
-            '檢核結果', '備註', '執行時間', '檢核時間', '建立者UID', '建立者Email'
+        // --- 欄位分類 ---
+        const executorFields = [
+            'clientName', 'date', 'platform', 'verificationType', 'accountNameId',
+            'targetOriginalAccountBudget', 'targetAccountBudgetAfterTopUp', 
+            'adBudgetType', 'targetAmount', 'targetStartDate', 'targetEndDate',
+            'executor', 'notes'
         ];
-        let csvRows = [];
-        csvRows.push(header.join(','));
+        const reviewerFields = [
+            'actualOriginalAccountBudget', 'actualAccountBudgetAfterTopUp', 
+            'actualSet', 'actualStartDate', 'actualEndDate',
+            'reviewer', 'result'
+        ];
 
-        allChecklistData.forEach(item => {
-            const row = [
-                item.id, `\"${item.project || ''}\"`, `\"${item.account || ''}\"`,
-                item.date || '', item.isBudgetChecked ? '是' : '否',
-                item.creatorEmail || '', item.reviewerEmail || '',
-                item.result || '', 
-                `\"${item.notes ? item.notes.replace(/\"/g, '\"\"').replace(/\\n/g, ' ') : ''}\"`,
-                item.executionTimestampDisplay || '', item.reviewTimestampDisplay || '', 
-                item.createdByUserId || '', item.creatorEmail || ''
-            ];
-            csvRows.push(row.map(cell => {
-                let cellString = String(cell);
-                if (cellString.includes(',') || cellString.includes('"') || cellString.includes('\n')) {
-                    cellString = `"${cellString.replace(/"/g, '""')}"`;
-                }
-                return cellString;
-            }).join(','));
-        });
+        // Utility function to show status messages
+        function showStatus(message, type = 'info', targetId = 'statusMessage') {
+            const status = document.getElementById(targetId);
+            status.textContent = message;
+            status.className = 'mt-4 p-3 rounded-lg text-center text-sm font-medium';
+            status.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700', 'bg-blue-100', 'text-blue-700', 'text-gray-600');
 
-        const csvString = csvRows.join('\n');
-        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', 'Budget_Checklist_Export_' + new Date().toISOString().slice(0, 10) + '.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-    
-    // (您的 editChecklist 和 viewChecklist 函數也應該被公開，這裡假設它們是空的或您稍後會添加)
-    window.editChecklist = (id) => { alert(`編輯功能 ${id} (尚未實作)`); }
-    window.viewChecklist = (id) => { alert(`查看功能 ${id} (尚未實作)`); }
-
-
-    // =================================================================
-    // 4. 管理者後台相關函數 (V9 修復 + 公開)
-    // =================================================================
-
-    function displayUserList(querySnapshot) {
-        const userListBody = document.getElementById('userListBody');
-        userListBody.innerHTML = '';
-
-        querySnapshot.forEach(doc => {
-            const user = doc.data();
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50';
-            // 注意：這裡呼叫的 updateUserRole 會指向 window.updateUserRole
-            tr.innerHTML = `
-                <td class="whitespace-nowrap">${doc.id}</td>
-                <td class="whitespace-nowrap">${user.role || 'user'}</td>
-                <td class="text-right">
-                    <select onchange="updateUserRole('${doc.id}', this.value)" class="p-1 border rounded">
-                        <option value="user" ${user.role !== 'admin' ? 'selected' : ''}>User</option>
-                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                    </select>
-                </td>
-            `;
-            userListBody.appendChild(tr);
-        });
-    }
-
-    // 將函數掛載到 window，供 HTML 內聯事件調用
-    window.updateUserRole = (userId, newRole) => {
-        if (!isAdminUser) {
-            alert("您沒有權限修改用戶角色。");
-            return;
+            if (type === 'error') {
+                status.classList.add('bg-red-100', 'text-red-700');
+            } else if (type === 'success') {
+                status.classList.add('bg-green-100', 'text-green-700');
+            } else if (type === 'info') {
+                 status.classList.add('bg-blue-100', 'text-blue-700');
+            } else {
+                status.classList.add('text-gray-600');
+            }
         }
         
-        setDoc(doc(db, "public", "data", "user_roles", userId), {
-            role: newRole
-        }, { merge: true })
-        .then(() => {
-            alert(`用戶 ${userId} 的角色已更新為 ${newRole}`);
-            loadUserRoles(); 
-        })
-        .catch(error => {
-            alert("更新角色失敗：" + error.message);
-            console.error("更新角色失敗:", error);
-        });
-    }
+        // --- 驗證與權限核心邏輯 ---
 
+        async function googleSignIn() {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+                // onAuthStateChanged 會處理後續的 UI 更新和資料載入
+            } catch (error) {
+                console.error("Google Sign-In Failed:", error);
+                let errorMessage = `❌ Google 登入失敗: ${error.message}`;
+                if (error.code === 'auth/unauthorized-domain') {
+                    errorMessage = `❌ Google 登入失敗: Firebase: Error (${error.code})。請至您的 Firebase Console -> Authentication -> Settings -> Authorized domains，將此應用程式的運行網域加入白名單。`;
+                }
+                showStatus(errorMessage, 'error', 'authStatus');
+            }
+        }
 
-    // =================================================================
-    // 5. 檢查管理員狀態的輔助函數 (V9 修復時序)
-    // =================================================================
+        async function googleSignOut() {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Sign Out Failed:", error);
+            }
+        }
 
-    function checkUserAdminStatus(uid) {
-        getDoc(doc(db, "public", "data", "user_roles", uid))
-            .then(docSnap => {
-                if (docSnap.exists() && docSnap.data().role === 'admin') {
-                    isAdminUser = true;
-                    document.getElementById("adminPanel").style.display = "block";
-                    loadUserRoles(); 
+        /**
+         * 檢查用戶角色並儲存/更新到 Firestore
+         */
+        async function checkUserRole(user) {
+            if (!db || !user) {
+                isAdmin = false;
+                return;
+            }
+            
+            const roleDocRef = doc(db, USER_ROLES_COLLECTION_PATH, user.uid);
+            
+            // 確保 email 存在並轉換為小寫，以進行穩定的比較
+            const lowerCaseEmail = user.email ? user.email.toLowerCase() : '';
+            
+            try {
+                // 嘗試從 Firestore 獲取角色資訊
+                const roleSnapshot = await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH))); 
+                let foundRole = roleSnapshot.docs.find(d => d.id === user.uid)?.data();
+                
+                // 1. 檢查是否為預設管理者 (硬編碼)
+                if (lowerCaseEmail === DEFAULT_ADMIN_EMAIL) {
+                    isAdmin = true;
+                    // 確保預設管理者在 user_roles 中有記錄且角色正確
+                    if (!foundRole || foundRole.role !== 'admin' || foundRole.email.toLowerCase() !== lowerCaseEmail) {
+                        await setDoc(roleDocRef, { 
+                            email: user.email, 
+                            role: 'admin',
+                            lastLogin: serverTimestamp() 
+                        }, { merge: true });
+                    }
+                } else if (foundRole) {
+                    // 2. 檢查是否有已設定的角色
+                    isAdmin = foundRole.role === 'admin';
+                    // 更新登入時間
+                     await setDoc(roleDocRef, { 
+                        lastLogin: serverTimestamp() 
+                    }, { merge: true });
                 } else {
-                    isAdminUser = false;
-                    document.getElementById("adminPanel").style.display = "none";
+                    // 3. 預設為一般使用者 (並記錄)
+                    isAdmin = false;
+                    await setDoc(roleDocRef, { 
+                        email: user.email, 
+                        role: 'user',
+                        lastLogin: serverTimestamp() 
+                    }, { merge: true });
                 }
-            })
-            .catch(error => {
-                console.error("檢查管理員狀態失敗:", error);
-                isAdminUser = false;
-                document.getElementById("adminPanel").style.display = "none";
-            });
-    }
 
-// =================================================================
-// 6. 核心登入/登出邏輯 (V9 修復時序)
-// =================================================================
-
-// *** 核心修復：監聽登入狀態 (不需等待 DOM 載入，所以放在外面) ***
-onAuthStateChanged(auth, user => { 
-    if (user) {
-        // --- 使用者已登入 ---
-        currentUserId = user.uid;
-        currentUserEmail = user.email;
-        document.getElementById("userStatus").innerText = `已登入: ${currentUserEmail}`;
-        document.getElementById("authPanel").style.display = "none";
-        document.getElementById("content").style.display = "block";
-        
-        loadHistoryChecklists(); 
-        checkUserAdminStatus(user.uid);
-
-    } else {
-        // --- 使用者已登出 ---
-        currentUserId = null;
-        currentUserEmail = null;
-        isAdminUser = false;
-        document.getElementById("userStatus").innerText = "未登入";
-        document.getElementById("authPanel").style.display = "block";
-        document.getElementById("content").style.display = "none";
-        document.getElementById("adminPanel").style.display = "none";
-
-        // 清空並顯示未登入訊息
-        document.getElementById("historyListBody").innerHTML = '';
-        document.getElementById("userListBody").innerHTML = '';
-        document.getElementById("historyMessage").innerText = "❌ 未登入，無法載入歷史記錄。請登入。";
-        document.getElementById("userListMessage").innerText = "❌ 未登入，無法載入用戶列表。請登入。";
-    }
-});
-
-
-// *** 關鍵修復點：確保在附加事件監聽器前，DOM 已經載入完畢 ***
-document.addEventListener('DOMContentLoaded', () => {
-
-    // 登入按鈕點擊處理 (改用 signInWithRedirect 解決彈窗問題)
-    document.getElementById('signInButton').addEventListener('click', () => {
-        const provider = new GoogleAuthProvider(); 
-        
-        // 核心修改：使用 Redirect 模式
-        signInWithRedirect(auth, provider) 
-            .catch(error => {
-                console.error("嘗試啟動重新導向失敗:", error);
-                alert(`登入啟動失敗: ${error.message}`);
-            });
-    });
-
-    // 登出按鈕點擊處理
-    document.getElementById('signOutButton').addEventListener('click', () => {
-        signOut(auth); 
-    });
-
-
-    // =================================================================
-    // 7. 送出核對表單 (V9 修復)
-    // =================================================================
-
-    document.getElementById('checklistForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        if (!currentUserId) {
-            alert("請先登入才能送出表格！");
-            return;
+                console.log(`User ${user.email} role: ${isAdmin ? 'Admin' : 'User'}`);
+            } catch (e) {
+                console.error("Error checking user role:", e);
+                // 發生錯誤時，至少檢查是否為硬編碼管理者
+                isAdmin = (lowerCaseEmail === DEFAULT_ADMIN_EMAIL); 
+            }
         }
 
-        const form = e.target;
-        const project = form.project.value;
-        const account = form.account.value;
-        const date = form.date.value;
-        const isBudgetChecked = form.isBudgetChecked.checked;
-        const reviewerEmail = form.reviewerEmail.value;
+        /**
+         * 處理身份驗證狀態改變
+         */
+        function handleAuthStateChange(user) {
+            const authButton = document.getElementById('authButton');
+            const userEmailDisplay = document.getElementById('userEmailDisplay');
+            const adminPanelButton = document.getElementById('adminPanelButton');
+            
+            currentUser = user;
+            
+            if (user) {
+                userId = user.uid;
+                // 修正 user.email 可能為 null 的問題，並確保用於顯示
+                userEmail = user.email || '未提供 Email'; 
+                
+                // 清除登入錯誤提示
+                showStatus('', 'info', 'authStatus');
 
-        if (!reviewerEmail.includes('@')) {
-             alert("請輸入有效的檢核人 Email 地址。");
-             return;
+                document.getElementById('loadingIndicator').classList.remove('hidden');
+
+                // 檢查角色
+                checkUserRole(user).then(() => {
+                    // 更新 UI 狀態
+                    authButton.textContent = '登出';
+                    authButton.onclick = googleSignOut;
+                    
+                    // 修正 userEmail 顯示 null 的問題
+                    userEmailDisplay.innerHTML = `**${userEmail}** (${isAdmin ? '管理者' : '一般用戶'})`;
+                    document.getElementById('checklistForm').classList.remove('hidden');
+                    
+                    
+                    document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false);
+
+                    if (isAdmin) {
+                        adminPanelButton.classList.remove('hidden');
+                        adminPanelButton.onclick = openAdminPanel;
+                    } else {
+                         adminPanelButton.classList.add('hidden');
+                    }
+                    
+                    loadChecklists(); // 登入後載入資料
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+
+                }).catch(e => {
+                    console.error("Role check failed:", e);
+                    showStatus(`角色檢查失敗: ${e.message}。請檢查 Firestore 規則。`, 'error');
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+                });
+
+            } else {
+                // 未登入狀態
+                userId = null;
+                userEmail = null;
+                isAdmin = false;
+                authButton.textContent = '登入 Google';
+                authButton.onclick = googleSignIn;
+                userEmailDisplay.innerHTML = '請登入 Google';
+                document.getElementById('checklistForm').classList.add('hidden');
+                document.getElementById('historyTableContainer').innerHTML = '<p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>';
+                document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true);
+                adminPanelButton.classList.add('hidden');
+                document.getElementById('loadingIndicator').classList.add('hidden');
+                showStatus("您已登出。", 'info');
+            }
+        }
+        
+        // --- 表單流程控制 ---
+
+        /**
+         * 根據當前模式 (新增/修改執行/檢核) 鎖定或解鎖欄位
+         */
+        function setFormMode(mode, currentCreatorId = null) {
+            editMode = mode;
+            const form = document.getElementById('checklistForm');
+            const saveButton = document.getElementById('saveButton');
+            const isCreator = currentCreatorId === userId;
+            
+            // 1. 執行人 (executor) 欄位控制
+            form.querySelectorAll('.executor-field input, .executor-field select').forEach(el => {
+                const isExecutorModifiable = (mode === 'new' || (mode === 'edit_executor' && isCreator));
+                el.disabled = !isExecutorModifiable;
+                // 新增資料或修改執行資料時，必填欄位才需要 required 屬性
+                if (executorFields.includes(el.name) && ['clientName', 'date', 'accountNameId', 'executor'].includes(el.name)) {
+                    el.required = (mode === 'new' || mode === 'edit_executor');
+                }
+            });
+
+            // 2. 檢核人 (reviewer) 欄位控制
+            form.querySelectorAll('.reviewer-field input, .reviewer-field select').forEach(el => {
+                const isReviewerModifiable = (mode === 'edit_reviewer' && !isCreator);
+                el.disabled = !isReviewerModifiable;
+                // 檢核資料時，檢核人姓名和結果是必填
+                if (el.name === 'reviewer' || el.name === 'result') {
+                    el.required = mode === 'edit_reviewer';
+                }
+            });
+            
+            // 3. 基本資料欄位 (Creator only)
+            // 這些欄位必須放在 executorFields 內進行統一控制
+            form.elements['clientName'].disabled = (mode !== 'new' && !isCreator);
+            form.elements['date'].disabled = (mode !== 'new' && !isCreator);
+            form.elements['platform'].disabled = (mode !== 'new' && !isCreator);
+            form.elements['verificationType'].disabled = (mode !== 'new' && !isCreator);
+            form.elements['accountNameId'].disabled = (mode !== 'new' && !isCreator);
+
+            // 4. 備註欄位 (Notes) - 兩邊都可以寫，所以統一解鎖
+            form.elements['notes'].disabled = false;
+            
+            // 5. 更新按鈕文字
+            if (mode === 'new') {
+                document.getElementById('formTitle').textContent = "廣告活動與預算細節 (新增執行設定)";
+                saveButton.textContent = "💾 儲存執行設定 (建立新紀錄)";
+                saveButton.disabled = false;
+            } else if (mode === 'edit_executor') {
+                document.getElementById('formTitle').textContent = `廣告活動與預算細節 (修改執行設定)`;
+                saveButton.textContent = "🔄 更新執行設定";
+                saveButton.disabled = false;
+            } else if (mode === 'edit_reviewer') {
+                document.getElementById('formTitle').textContent = `廣告活動與預算細節 (進行檢核)`;
+                saveButton.textContent = "✅ 儲存檢核結果";
+                saveButton.disabled = false;
+            }
         }
 
-        addDoc(collection(doc(db, "public", "data"), "budget_checklists"), {
-            project: project,
-            account: account,
-            date: date,
-            isBudgetChecked: isBudgetChecked,
-            reviewerEmail: reviewerEmail,
-            result: null, 
-            notes: null,
-            executionTimestamp: serverTimestamp(), 
-            createdByUserId: currentUserId,
-            creatorEmail: currentUserEmail,
-        })
-        .then(() => {
-            alert("核對表已成功送出！");
-            form.reset(); 
-            loadHistoryChecklists(); 
-        })
-        .catch(error => {
-            alert("送出失敗：" + error.message);
-            console.error("送出失敗:", error);
+        // Reset the form and editing state
+        function resetForm() {
+            document.getElementById('checklistForm').reset();
+            editingId = null;
+            
+            // 清空時間戳記顯示
+            document.getElementById('executorTimeDisplay').textContent = 'N/A';
+            document.getElementById('reviewerTimeDisplay').textContent = 'N/A';
+            
+            setFormMode('new'); // 切換回新增模式
+            
+            // Clear calculation result
+            document.getElementById('calculatedResult').textContent = '（點擊按鈕進行計算）'; 
+            document.getElementById('calculatedResult').classList.remove('text-red-600', 'text-green-700');
+            showStatus("已清空表單，您可以新增一筆新資料。", 'info');
+        }
+
+        // Function to collect form data
+        function collectFormData() {
+            const form = document.getElementById('checklistForm');
+            
+            if (!form.checkValidity()) {
+                showStatus("錯誤：請檢查並填寫所有標註星號的必填欄位。", 'error');
+                return null;
+            }
+            
+            let dataToSave = {};
+
+            if (editMode === 'new') {
+                // 新增模式：只收集 Executor 欄位 + 創建資訊
+                dataToSave = {
+                    ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
+                    createdByUserId: userId,
+                    creatorEmail: userEmail,
+                    executionTimestamp: serverTimestamp(), // 建立時即為執行時間
+                    reviewTimestamp: null, // 檢核時間為空
+                };
+            } else if (editMode === 'edit_executor') {
+                // 修改執行模式：只允許修改 Executor 欄位 + 更新時間
+                dataToSave = {
+                    ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
+                    // notes 已包含在 executorFields 內
+                    executionTimestamp: serverTimestamp(), // 更新執行時間
+                };
+            } else if (editMode === 'edit_reviewer') {
+                 // 修改檢核模式：只允許修改 Reviewer 欄位 + 更新時間
+                dataToSave = {
+                    // 必須包含所有 Reviewer 欄位
+                    ...reviewerFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
+                    notes: form.elements['notes'].value, // 備註可修改
+                    reviewer: form.elements['reviewer'].value, // 檢核人必填
+                    result: form.elements['result'].value, // 結果必填
+                    reviewTimestamp: serverTimestamp(), // 更新檢核時間
+                };
+
+                // 檢核結果為「不通過」時阻止儲存 (前端提示)
+                if (dataToSave.result === 'fail') {
+                    showStatus("錯誤：核對結果為「不通過」，請先修正並將結果改為「通過」或在備註說明後再儲存。", 'error');
+                    return null;
+                }
+            }
+            
+            return dataToSave;
+        }
+
+        // Save (Add or Update) to Firestore
+        async function saveChecklist(event) {
+            event.preventDefault(); 
+            if (!db || !userId) {
+                 showStatus("❌ 儲存失敗: 請先登入。", 'error');
+                 return;
+            }
+            
+            const data = collectFormData();
+            if (!data) return;
+            
+            // 新增資料時，使用 addDoc (Firestore 自動產生 ID)
+            const path = CHECKLIST_COLLECTION_PATH;
+            const docRef = editingId ? doc(db, path, editingId) : collection(db, path);
+
+            try {
+                if (editingId) {
+                    // Update existing document using setDoc (Firestore Rules will check permissions)
+                    await setDoc(doc(db, path, editingId), data, { merge: true });
+                    showStatus(`✅ 核對結果已成功更新 (${editMode})。`, 'success');
+                } else {
+                    // Add new document
+                    await addDoc(docRef, data);
+                    showStatus("✅ 執行設定已成功儲存並建立新紀錄。", 'success');
+                }
+                resetForm(); // Reset form after successful save/update
+                
+            } catch (e) {
+                console.error("Error saving document: ", e);
+                // 這裡會捕獲 'Missing or insufficient permissions.' 錯誤
+                showStatus(`❌ 儲存失敗: ${e.message}。請檢查您的 Firestore 安全規則！`, 'error');
+            }
+        }
+
+        // Load data using onSnapshot (and re-render the history table)
+        function loadChecklists() {
+            if (!db || !userId) return;
+            const path = CHECKLIST_COLLECTION_PATH;
+            const q = collection(db, path); 
+
+            onSnapshot(q, (snapshot) => {
+                checklistData = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    const formatTimestamp = (ts) => ts?.toDate()?.toLocaleString('zh-TW') || 'N/A';
+                    return {
+                        id: doc.id,
+                        ...data,
+                        executionTimestampDisplay: formatTimestamp(data.executionTimestamp),
+                        reviewTimestampDisplay: formatTimestamp(data.reviewTimestamp),
+                    };
+                }).sort((a, b) => {
+                    // 優先按執行時間倒序排列
+                    const tsA = b.executionTimestampDisplay !== 'N/A' ? new Date(b.executionTimestampDisplay) : new Date(0);
+                    const tsB = a.executionTimestampDisplay !== 'N/A' ? new Date(a.executionTimestampDisplay) : new Date(0);
+                    return tsA - tsB;
+                }); 
+
+                showStatus(`💾 已載入 ${checklistData.length} 筆歷史核對記錄。`, 'info', 'historyStatus');
+                renderHistoryTable(); 
+            }, (error) => {
+                console.error("Error listening to collection: ", error);
+                showStatus(`❌ 載入歷史記錄失敗: ${error.message}。請檢查 Firestore 規則是否允許讀取。`, 'error', 'historyStatus');
+            });
+        }
+
+        // Delete a record
+        async function deleteChecklist(id) {
+            if (!db || !isAdmin) {
+                showStatus("❌ 刪除失敗: 只有管理者可以刪除資料。", 'error', 'historyStatus');
+                return;
+            }
+            
+            if (!confirm("確定要刪除這筆記錄嗎？此操作無法復原。")) return;
+            
+            const path = CHECKLIST_COLLECTION_PATH;
+            const docRef = doc(db, path, id);
+            
+            try {
+                // 執行刪除操作
+                await deleteDoc(docRef);
+                showStatus("🗑️ 記錄已成功刪除。", 'success', 'historyStatus');
+                // onSnapshot 會自動更新列表，無需手動修改 checklistData
+                if (editingId === id) {
+                    resetForm();
+                }
+            } catch (e) {
+                console.error("Error deleting document: ", e);
+                // 捕獲刪除失敗的錯誤，可能是權限不足 (Missing or insufficient permissions)
+                showStatus(`❌ 刪除失敗: ${e.message}。請檢查您的 Firestore 規則，確保管理者有 delete 權限。`, 'error', 'historyStatus');
+            }
+        }
+
+        // Start editing/reviewing a record
+        function startEditOrReview(id, mode) {
+            const item = checklistData.find(d => d.id === id);
+            if (!item) {
+                showStatus(`找不到 ID 為 ${id} 的記錄。`, 'error');
+                return;
+            }
+            
+            const form = document.getElementById('checklistForm');
+            // 1. 填充表單
+            for (const key in item) {
+                if (form.elements[key]) {
+                    form.elements[key].value = item[key] || '';
+                }
+            }
+            
+            // 填充簽核時間
+            document.getElementById('executorTimeDisplay').textContent = item.executionTimestampDisplay;
+            document.getElementById('reviewerTimeDisplay').textContent = item.reviewTimestampDisplay;
+
+            // 2. 更新編輯狀態
+            editingId = id;
+            setFormMode(mode, item.createdByUserId);
+
+            // 3. 滾動到表單頂部
+            document.getElementById('formTitle').scrollIntoView({ behavior: 'smooth' });
+
+            // 4. 重設計算結果
+            document.getElementById('calculatedResult').textContent = '（點擊按鈕進行重新計算）'; 
+            document.getElementById('calculatedResult').classList.remove('text-red-600', 'text-green-700');
+        }
+
+        // Render the history table
+        function renderHistoryTable() {
+            const container = document.getElementById('historyTableContainer');
+            if (checklistData.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 p-4 text-center">目前沒有歷史核對記錄。</p>';
+                return;
+            }
+
+            let html = `
+                <table class="w-full text-sm text-left text-gray-700 bg-white shadow-md rounded-lg overflow-hidden">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3">帳號/客戶名稱</th>
+                            <th scope="col" class="px-6 py-3">執行人</th> 
+                            <th scope="col" class="px-6 py-3">檢核人</th>
+                            <th scope="col" class="px-6 py-3">結果</th>
+                            <th scope="col" class="px-6 py-3">最後執行時間</th>
+                            <th scope="col" class="px-6 py-3">最後檢核時間</th>
+                            <th scope="col" class="px-6 py-3">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            checklistData.forEach(item => {
+                const statusClass = item.result === 'pass' ? 'text-green-600 bg-green-50' : (item.result === 'fail' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50');
+                const statusText = item.result === 'pass' ? '✅ 通過' : (item.result === 'fail' ? '❌ 不通過' : '⚪ 待檢核');
+                
+                // 判斷操作按鈕
+                const isCreator = item.createdByUserId === userId;
+                let actionButton;
+
+                if (isCreator) {
+                    // Creator can always edit their own executor fields
+                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_executor')" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">修改</button>`;
+                } else if (item.result !== 'pass' && item.result !== 'fail') {
+                    // Others (Reviewer) can review if the result is pending
+                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_reviewer')" class="text-green-600 hover:text-green-900 font-medium mr-3">檢核</button>`;
+                } else {
+                    // Everyone can view completed records (no action needed)
+                    actionButton = `<span class="text-gray-500">已完成</span>`;
+                }
+
+                // Admin only delete button
+                let deleteButton = '';
+                if (isAdmin) {
+                    deleteButton = `<button onclick="window.deleteChecklist('${item.id}')" class="text-red-600 hover:text-red-900 font-medium ml-3">刪除</button>`;
+                }
+
+
+                html += `
+                    <tr class="bg-white border-b hover:bg-gray-50">
+                        <td class="px-6 py-4 font-medium text-gray-900">
+                            ${item.clientName}<br>
+                            <span class="text-xs text-gray-500">${item.accountNameId || 'N/A'}</span>
+                        </td>
+                        <td class="px-6 py-4 font-medium text-gray-900">${item.executor || 'N/A'}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">${item.reviewer || 'N/A'}</td> 
+                        <td class="px-6 py-4">
+                            <span class="text-xs font-medium px-2.5 py-0.5 rounded ${statusClass}">
+                                ${statusText}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-xs">${item.executionTimestampDisplay}</td>
+                        <td class="px-6 py-4 text-xs">${item.reviewTimestampDisplay}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            ${actionButton}
+                            ${deleteButton}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+            `;
+            container.innerHTML = html;
+        }
+        
+        // --- 管理員後台功能 ---
+
+        async function openAdminPanel() {
+            if (!isAdmin) return;
+            document.getElementById('adminPanel').style.display = 'flex';
+            
+            const userListContainer = document.getElementById('userListContainer');
+            userListContainer.innerHTML = '<p class="text-center text-gray-500">載入用戶中...</p>';
+
+            try {
+                // 確保從最新的數據庫狀態獲取角色
+                const q = collection(db, USER_ROLES_COLLECTION_PATH);
+                const querySnapshot = await getDocs(q);
+                
+                let userListHtml = '';
+                querySnapshot.forEach(docSnapshot => {
+                    const docId = docSnapshot.id;
+                    const userData = docSnapshot.data();
+                    const currentIsAdminRole = userData.role === 'admin';
+                    const isCurrentUser = docId === userId;
+                    const isDefaultAdmin = userData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL;
+
+                    // 權限變更按鈕
+                    const toggleButtonText = currentIsAdminRole ? '降級為一般用戶' : '升級為管理者';
+                    const toggleButtonColor = currentIsAdminRole ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600';
+                    let toggleButtonDisabled = isCurrentUser ? 'disabled' : ''; // 無法修改自己的權限
+                    if (isDefaultAdmin && currentIsAdminRole) {
+                        // 預設管理者無法被降級
+                        toggleButtonDisabled = 'disabled';
+                    }
+
+                    const toggleButtonClass = toggleButtonDisabled ? 'opacity-50 cursor-not-allowed' : '';
+                    const userRoleText = currentIsAdminRole ? '管理者' : '一般用戶';
+
+                    // 移除角色記錄按鈕 (移除 Firestore 中的 user_roles 記錄)
+                    const removeButton = !isCurrentUser && !isDefaultAdmin ? 
+                        `<button onclick="window.removeUserRoleRecord('${docId}')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-bold py-1 px-2 rounded-lg transition duration-150 ml-2">移除記錄</button>` 
+                        : '';
+
+                    userListHtml += `
+                        <div class="flex items-center justify-between p-3 border-b">
+                            <div>
+                                <p class="font-medium text-gray-900 break-all">${userData.email} 
+                                    ${isDefaultAdmin ? '<span class="text-xs text-yellow-600">(預設管理員)</span>' : ''}
+                                </p>
+                                <p class="text-sm text-gray-500">ID: ${docId.substring(0, 8)}... (${userRoleText})</p>
+                            </div>
+                            <div class="flex items-center">
+                                <button 
+                                    id="roleBtn-${docId}"
+                                    onclick="window.toggleUserRole('${docId}', '${currentIsAdminRole}')"
+                                    class="${toggleButtonColor} text-white text-xs font-bold py-1 px-2 rounded-lg transition duration-150 ${toggleButtonClass}"
+                                    ${toggleButtonDisabled}>
+                                    ${isCurrentUser ? '自己的權限' : toggleButtonText}
+                                </button>
+                                ${removeButton}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                userListContainer.innerHTML = userListHtml || '<p class="text-center text-gray-500">目前沒有其他用戶記錄。</p>';
+
+            } catch (e) {
+                userListContainer.innerHTML = `<p class="text-red-500">載入用戶列表失敗: ${e.message}</p>`;
+                console.error("Error loading user roles:", e);
+            }
+        }
+        
+        async function toggleUserRole(targetUserId, currentIsAdminString) {
+            if (!isAdmin) return;
+            
+            const currentIsAdmin = currentIsAdminString === 'true';
+            const newRole = currentIsAdmin ? 'user' : 'admin';
+            const roleDocRef = doc(db, USER_ROLES_COLLECTION_PATH, targetUserId);
+
+            try {
+                // 確保無法降級預設管理者
+                const targetUserData = (await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH)))).docs.find(d => d.id === targetUserId)?.data();
+                if (targetUserData && targetUserData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL && newRole === 'user') {
+                     showStatus(`❌ 權限變更失敗: 無法將預設管理員降級。`, 'error', 'historyStatus');
+                     return;
+                }
+
+                await setDoc(roleDocRef, { role: newRole }, { merge: true });
+                showStatus(`✅ 用戶 ${targetUserId.substring(0, 8)}... 已成功設置為 ${newRole === 'admin' ? '管理者' : '一般用戶'}。`, 'success', 'historyStatus');
+                openAdminPanel(); // 重新載入列表
+            } catch (e) {
+                showStatus(`❌ 權限變更失敗: ${e.message}`, 'error', 'historyStatus');
+            }
+        }
+
+        async function removeUserRoleRecord(targetUserId) {
+             if (!isAdmin) return;
+
+            // 確保無法移除自己的角色記錄或預設管理者的記錄
+            const targetUserData = (await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH)))).docs.find(d => d.id === targetUserId)?.data();
+            if (targetUserId === userId) {
+                 showStatus(`❌ 移除記錄失敗: 無法移除自己的角色記錄。`, 'error', 'historyStatus');
+                 return;
+            }
+            if (targetUserData && targetUserData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL) {
+                 showStatus(`❌ 移除記錄失敗: 無法移除預設管理員的角色記錄。`, 'error', 'historyStatus');
+                 return;
+            }
+
+            if (!confirm(`確定要移除用戶 ${targetUserId.substring(0, 8)}... 在 Firestore 中的角色記錄嗎？這將使他變回一般用戶。`)) return;
+
+            const roleDocRef = doc(db, USER_ROLES_COLLECTION_PATH, targetUserId);
+
+            try {
+                await deleteDoc(roleDocRef);
+                showStatus(`🗑️ 用戶 ${targetUserId.substring(0, 8)}... 的角色記錄已移除。`, 'success', 'historyStatus');
+                openAdminPanel(); // 重新載入列表
+            } catch (e) {
+                showStatus(`❌ 移除角色記錄失敗: ${e.message}`, 'error', 'historyStatus');
+            }
+        }
+
+
+        // --- 全域函數暴露 (供 HTML 內聯調用) ---
+        window.startEditOrReview = startEditOrReview;
+        window.deleteChecklist = deleteChecklist;
+        window.resetForm = resetForm;
+        window.toggleUserRole = toggleUserRole;
+        window.removeUserRoleRecord = removeUserRoleRecord; // 新增移除功能
+        window.closeAdminPanel = closeAdminPanel;
+        
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+
+            try {
+                app = initializeApp(configToUse);
+                db = getFirestore(app);
+                auth = getAuth(app);
+            } catch (e) {
+                console.error("Firebase Initialization Failed:", e);
+                showStatus(`❌ 連線錯誤: ${e.message}。請檢查您的 Firebase 配置。`, 'error', 'loadingIndicator');
+                return;
+            }
+            
+            // 設定登入/登出監聽器
+            onAuthStateChanged(auth, handleAuthStateChange);
+            
+            // 表單事件
+            document.getElementById('checklistForm').addEventListener('submit', saveChecklist);
+            document.getElementById('newRecordButton').addEventListener('click', () => { window.resetForm(); });
+            document.getElementById('exportButton').addEventListener('click', exportToCSV);
+            
+            // 首次載入時，將表單設置為新增模式的預設狀態
+            setFormMode('new'); 
         });
-    });
+        
+        // Export to CSV function (must be defined in module scope to access checklistData)
+        function exportToCSV() {
+            if (checklistData.length === 0) {
+                showStatus("🚫 沒有可匯出的記錄。", 'error');
+                return;
+            }
 
-});
+            // 1. 定義 CSV 標頭 
+            const headers = [
+                "客戶名稱", "建立/修改日期", "廣告平台", "檢核類型", "帳號名稱/帳號ID", // 新欄位
+                "原帳戶執行設定預算", "原帳戶檢核設定預算", "加值後執行設定預算", "加值後檢核設定預算", 
+                "廣告預算類型", "廣告活動執行設定金額", "廣告活動檢核設定金額", 
+                "執行設定開始日期", "執行設定結束日期", "檢核設定開始日期", "檢核設定結束日期", 
+                "執行人", "核對人", "核對結果", "備註", 
+                "最後執行時間", "最後檢核時間", // 新增時間戳記
+                "建立者User ID", "建立者Email" // 新增創建者資訊
+            ];
+            
+            // 2. Map data to header order
+            const csvRows = [
+                headers.join(',')
+            ];
 
-</script>
+            checklistData.forEach(item => {
+                const row = [
+                    item.clientName, 
+                    item.date, 
+                    item.platform, 
+                    item.verificationType, 
+                    item.accountNameId, // 新欄位
+                    item.targetOriginalAccountBudget, 
+                    item.actualOriginalAccountBudget, 
+                    item.targetAccountBudgetAfterTopUp, 
+                    item.actualAccountBudgetAfterTopUp, 
+                    item.adBudgetType, 
+                    item.targetAmount, 
+                    item.actualSet, 
+                    item.targetStartDate || '', 
+                    item.targetEndDate || '',   
+                    item.actualStartDate || '', 
+                    item.actualEndDate || '',   
+                    item.executor, 
+                    item.reviewer, 
+                    item.result, 
+                    `"${item.notes ? item.notes.replace(/"/g, '""').replace(/\n/g, ' ') : ''}"`,
+                    item.executionTimestampDisplay, // 執行時間
+                    item.reviewTimestampDisplay, // 檢核時間
+                    item.createdByUserId || 'N/A', 
+                    item.creatorEmail || 'N/A'
+                ];
+                csvRows.push(row.map(cell => {
+                    // 確保逗號被處理
+                    let cellString = String(cell);
+                    if (cellString.includes(',')) {
+                        cellString = `"${cellString.replace(/"/g, '""')}"`;
+                    }
+                    return cellString;
+                }).join(','));
+            });
+
+            const csvString = csvRows.join('\n');
+            
+            // 3. 建立 Blob 並下載 (加入 BOM 解決中文亂碼問題)
+            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'Budget_Checklist_Export_' + new Date().toISOString().slice(0, 10) + '.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showStatus("⬇️ 歷史紀錄已匯出為 CSV 檔案。", 'success');
+        }
+
+    </script>
 </body>
-
 </html>
-
-
-
-
