@@ -1016,7 +1016,8 @@
                     const userData = docSnapshot.data();
                     const currentIsAdminRole = userData.role === 'admin';
                     const isCurrentUser = docId === userId;
-                    const isDefaultAdmin = userData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL;
+                    const userEmail = userData.email;
+                    const isDefaultAdmin = userEmail && userEmail.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
 
                     // 權限變更按鈕
                     const toggleButtonText = currentIsAdminRole ? '降級為一般用戶' : '升級為管理者';
@@ -1075,7 +1076,8 @@
             try {
                 // 確保無法降級預設管理者
                 const targetUserData = (await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH)))).docs.find(d => d.id === targetUserId)?.data();
-                if (targetUserData && targetUserData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL && newRole === 'user') {
+                const targetUserEmail = targetUserData?.email;
+                if (targetUserData && targetUserEmail && targetUserEmail.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase() && newRole === 'user') {
                      showStatus(`❌ 權限變更失敗: 無法將預設管理員降級。`, 'error', 'historyStatus');
                      return;
                 }
@@ -1227,3 +1229,4 @@
     </script>
 </body>
 </html>
+
