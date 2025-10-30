@@ -501,9 +501,10 @@
          * @param {string} mode 'new', 'executor', 'reviewer', 'view'
          */
         window.openEditModal = (docId = null, mode = 'new') => {
+            // ** 關鍵安全檢查：未登入者只能查看，不能新增或編輯 **
             if (!currentUser && mode !== 'view') {
                 showToast('請先登入才能新增或編輯資料。', 'error');
-                return;
+                return; // 直接返回，不執行開啟 modal 的程式碼
             }
 
             const modal = document.getElementById('checklistModal');
@@ -625,6 +626,7 @@
                 }
             };
 
+            // ** 開啟 Modal **
             modal.style.display = 'block';
         };
 
@@ -816,8 +818,9 @@
             <h1 class="text-3xl font-bold mb-2 sm:mb-0">廣告預算核對雙簽表</h1>
             <div class="flex items-center space-x-3">
                 <span id="auth-status" class="text-sm italic">請登入</span>
+                <!-- FIXED: 移除 'hidden' 類別，確保登入按鈕預設可見 -->
                 <button id="login-button" onclick="signInWithGoogle()" 
-                        class="bg-white text-indigo-600 px-4 py-2 rounded-full font-semibold shadow-md hover:bg-gray-100 transition duration-150 hidden">
+                        class="bg-white text-indigo-600 px-4 py-2 rounded-full font-semibold shadow-md hover:bg-gray-100 transition duration-150">
                     登入 Google
                 </button>
                 <button id="logout-button" onclick="signOutUser()" 
@@ -981,7 +984,7 @@
             </div>
 
             <p class="text-sm text-gray-600 mb-4">您可以將用戶提升或降級為管理員。您的 Email (${defaultAdminEmail}) 是預設管理員且無法移除。</p>
-            <p id="admin-error" class="p-2 bg-red-100 text-red-700 border-l-4 border-red-500 rounded-lg hidden text-sm mb-4" role="alert">錯誤訊息</p>
+            <p id="admin-error" class="p-2 bg-red-100 text-red-700 border-l-4 border-red-500 rounded-lg hidden text-sm mb-4" role="alert"></p>
 
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
