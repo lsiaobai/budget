@@ -28,1172 +28,697 @@
         .checklist-table tr:hover {
             background-color: #f7fafc;
         }
-        /* 針對日期輸入框做樣式調整 */
-        input[type="date"] {
-            padding: 4px 6px;
-            border: 1px solid #d1d5db;
-            border-radius: 0.375rem; /* rounded-md */
+        /* 針對日期欄位設置固定寬度以保持整齊 */
+        .date-col {
+            width: 150px; 
         }
-        /* Highlight required fields with a special class */
-        .is-required label::after, .is-required span.text-gray-700::after, 
-        .form-group-required label::after {
-            content: " *";
-            color: #ef4444; /* red-500 */
+        /* 確保按鈕有足夠的觸控面積 */
+        .action-button {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: transform 0.1s ease-in-out, background-color 0.1s;
         }
-        /* Disabled input style */
-        input:disabled, select:disabled, textarea:disabled {
-            background-color: #f9fafb;
-            cursor: not-allowed;
-            opacity: 0.8;
+        .action-button:hover {
+            transform: translateY(-1px);
         }
-        /* Admin Panel Modal */
-        #adminPanel {
-            position: fixed;
-            top: 0;
+        .action-button:active {
+            transform: translateY(0);
+        }
+        /* 彈出視窗樣式 */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 100; 
             left: 0;
+            top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 50;
-            display: none;
-            justify-content: center;
-            align-items: center;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4); 
+            padding-top: 50px;
         }
-        .admin-content {
-            background-color: white;
-            padding: 24px;
+        .modal-content {
+            background-color: #fff;
+            margin: 5% auto; 
+            padding: 20px;
             border-radius: 12px;
-            width: 90%;
-            max-width: 600px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            width: 90%; 
+            max-width: 800px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        /* 響應式佈局 */
+        @media (min-width: 640px) {
+            .checklist-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
-<body class="p-4 sm:p-8">
+<body class="p-4 md:p-8">
 
-    <div class="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden">
-        
-        <!-- 標題區塊 -->
-        <header class="p-6 sm:p-8 bg-indigo-600 text-white">
-            <h1 class="text-3xl sm:text-4xl font-extrabold mb-1">廣告預算核對雙簽表</h1>
-            <p class="text-indigo-200 text-lg">Campaign Budget Verification Checklist (C-BVC) - 權限控管版</p>
-            <p class="mt-3 text-sm italic">此表單用於確保所有預算設定經過兩層次核對，防止超支錯誤。</p>
-
-            <div class="mt-4 flex items-center justify-between">
-                <div id="authStatus" class="text-xs font-mono break-all">
-                    <span id="userEmailDisplay">請登入</span>
-                </div>
-                <div class="flex space-x-2">
-                    <button id="adminPanelButton" class="hidden bg-yellow-500 hover:bg-yellow-600 text-gray-900 text-xs font-bold py-1 px-3 rounded-full transition duration-150 shadow-md">
-                        👤 管理員後台
-                    </button>
-                    <button id="authButton" class="bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold py-1 px-3 rounded-full transition duration-150 shadow-md">
-                        登入 Google
-                    </button>
-                </div>
-            </div>
-            
-            <!-- 載入提示 -->
-            <div id="loadingIndicator" class="mt-3 text-sm font-semibold text-yellow-300 hidden">
-                正在載入中...
-            </div>
-        </header>
-
-        <!-- 表單內容：使用 form 標籤以便於重設 -->
-        <form id="checklistForm" class="hidden">
-            <!-- 基本資訊區塊 -->
-            <div class="p-6 sm:p-8 border-b border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">基本資料</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-600">
-                    <div class="flex flex-col form-group-required">
-                        <label class="font-medium text-sm mb-1">客戶名稱 (Client Name)</label>
-                        <input type="text" name="clientName" placeholder="輸入客戶全名" class="p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" required>
-                    </div>
-                    <div class="flex flex-col form-group-required">
-                        <label class="font-medium text-sm mb-1">建立/修改日期 (Date)</label>
-                        <input type="date" name="date" class="p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" required>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 預算核對表格 -->
-            <div class="p-6 sm:p-8 overflow-x-auto">
-                <h2 class="text-xl font-bold text-gray-800 mb-4" id="formTitle">廣告活動與預算細節</h2>
-                
-                <table class="checklist-table w-full border-collapse rounded-xl overflow-hidden">
-                    <thead>
-                        <tr>
-                            <th class="w-1/4">欄位類別 (Category)</th>
-                            <th class="w-1/4">設定內容 (Configuration)</th>
-                            <th class="w-1/4">執行設定 (Executor Setting)</th> <!-- Executor only fill -->
-                            <th class="w-1/4">檢核設定 (Reviewer Setting)</th> <!-- Reviewer only fill -->
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- 廣告平台 -->
-                        <tr>
-                            <td class="font-medium text-gray-700">廣告平台</td>
-                            <td>
-                                <select name="platform" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                                    <option>Meta Ads (Facebook/IG)</option>
-                                    <option>Google Ads</option>
-                                    <option>Line Ads</option>
-                                    <option>TikTok Ads</option>
-                                    <option>其他</option>
-                                </select>
-                            </td>
-                            <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-                        </tr>
-                        <!-- 帳號名稱/帳號ID (New Field Name) -->
-                        <tr>
-                            <td class="font-medium text-gray-700 is-required">帳號名稱/帳號ID</td>
-                            <td>
-                                <input type="text" name="accountNameId" placeholder="輸入帳號名稱/ID" class="w-full p-0.5 border-none bg-transparent focus:ring-0" required>
-                            </td>
-                            <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-                        </tr>
-                        <!-- 檢核類型 (Control Field) -->
-                        <tr>
-                            <td class="font-medium text-gray-700 is-required">檢核類型</td>
-                            <td>
-                                <select name="verificationType" id="verificationType" class="w-full p-0.5 border-none bg-transparent focus:ring-0" required>
-                                    <option value="account_budget">帳戶預算 (Account Budget)</option>
-                                    <option value="ad_budget">廣告預算 (Ad Budget)</option>
-                                    <option value="all">全部 (All)</option>
-                                </select>
-                            </td>
-                            <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-                        </tr>
-                        
-                        <!-- 預算相關欄位 (Account Budget) -->
-                        <tr id="row-targetOriginalAccountBudget">
-                            <td class="font-medium text-gray-700">原帳戶預算</td>
-                            <td>
-                                <label class="block text-xs font-semibold mb-1">預算變動前的值</label>
-                            </td>
-                            <td class="input-group executor-field">
-                                <input type="number" name="targetOriginalAccountBudget" placeholder="執行金額" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                            </td>
-                            <td class="input-group reviewer-field">
-                                <input type="number" name="actualOriginalAccountBudget" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                            </td>
-                        </tr>
-                        <tr id="row-targetAccountBudgetAfterTopUp">
-                            <td class="font-medium text-gray-700">加值後帳戶預算</td>
-                            <td>
-                                <label class="block text-xs font-semibold mb-1">預算變動後的值</label>
-                            </td>
-                            <td class="input-group executor-field">
-                                <input type="number" name="targetAccountBudgetAfterTopUp" placeholder="執行金額" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                            </td>
-                            <td class="input-group reviewer-field">
-                                <input type="number" name="actualAccountBudgetAfterTopUp" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                            </td>
-                        </tr>
-                        
-                        <!-- 廣告活動預算類型 (Ad Budget) -->
-                        <tr id="row-adBudgetType">
-                            <td class="font-medium text-gray-700">廣告預算類型</td>
-                            <td class="input-group executor-field">
-                                <select name="adBudgetType" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                                    <option value="">-- 請選擇 --</option>
-                                    <option>日預算 (Daily Budget)</option>
-                                    <option>總預算 (Lifetime Budget)</option>
-                                </select>
-                            </td>
-                            <td colspan="2" class="text-gray-500 text-sm">（選擇類型後請填寫）</td>
-                        </tr>
-                        
-                        <!-- 預算金額核對 (Ad Budget) -->
-                        <tr id="row-targetAmount" class="bg-yellow-50/50">
-                            <td class="font-bold text-indigo-700">廣告活動預算金額 (Budget)</td>
-                            <td>
-                                <label class="block text-xs font-semibold mb-1">最終設定的金額</label>
-                                <span class="text-gray-400 text-xs">（以當地貨幣計價）</span>
-                            </td>
-                            <td class="input-group executor-field">
-                                <input type="number" name="targetAmount" placeholder="執行數值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-red-600 font-semibold">
-                            </td>
-                            <td class="input-group reviewer-field">
-                                <input type="number" name="actualSet" placeholder="檢核設定值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-green-600 font-semibold">
-                            </td>
-                        </tr>
-                        
-                        <!-- 投放期間 - 開始日期 (Ad Budget) -->
-                        <tr id="row-targetStartDate1">
-                            <td class="font-medium text-gray-700" rowspan="2">投放期間 (Duration)</td>
-                            <td>
-                                <label class="block text-xs font-semibold mb-1">開始日期 (Start Date)</label>
-                            </td>
-                            <td class="input-group executor-field">
-                                <label class="block text-xs text-gray-500 mb-1">執行設定 (Target)</label>
-                                <input type="date" name="targetStartDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                            </td>
-                            <td class="input-group reviewer-field">
-                                <label class="block text-xs text-gray-500 mb-1">檢核設定 (Actual)</label>
-                                <input type="date" name="actualStartDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                            </td>
-                        </tr>
-                        <!-- 投放期間 - 結束日期 (Ad Budget) -->
-                        <tr id="row-targetEndDate2">
-                            <td>
-                                <label class="block text-xs font-semibold mb-1">結束日期 (End Date)</label>
-                            </td>
-                            <td class="input-group executor-field">
-                                <label class="block text-xs text-gray-500 mb-1">執行設定 (Target)</label>
-                                <input type="date" name="targetEndDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                            </td>
-                            <td class="input-group reviewer-field">
-                                <label class="block text-xs text-gray-500 mb-1">檢核設定 (Actual)</label>
-                                <input type="date" name="actualEndDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                
-                <!-- Budget Calculation Section -->
-                <div class="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <div class="flex flex-col sm:flex-row items-center gap-4">
-                        <button type="button" id="calculateBudgetButton" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 shadow-md">
-                            🧮 計算預估預算花費
-                        </button>
-                        <div id="calculatedResult" class="text-lg font-semibold text-purple-800 w-full text-center sm:text-left">
-                            （點擊按鈕進行計算）
-                        </div>
-                    </div>
-                    <p class="text-xs text-purple-500 mt-2">僅適用於「日預算」類型，將計算 [廣告活動執行設定預算金額 * 執行設定投放期間天數] 的總預估花費。</p>
-                </div>
-            </div>
-
-            <!-- 簽核區塊 -->
-            <div class="p-6 sm:p-8 bg-gray-50 border-t border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">雙簽與結果</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <!-- 執行人簽名 -->
-                    <div class="flex flex-col p-4 bg-white rounded-lg shadow-md border-t-4 border-indigo-300">
-                        <label class="font-bold text-indigo-600 mb-2">執行人 (Executor) 簽核 <span class="text-red-500">*</span></label>
-                        <p class="text-sm text-gray-500 mb-2">設定預算的第一責任人。</p>
-                        <input type="text" name="executor" id="executorInput" placeholder="請輸入姓名/工號確認" class="p-2 border-b border-gray-300 bg-gray-50 focus:border-indigo-500" required>
-                        <div class="mt-3 text-xs text-gray-400">
-                            執行人最後更新: <span id="executorTimeDisplay" class="font-medium text-gray-700">N/A</span>
-                        </div>
-                    </div>
-                    
-                    <!-- 核對人簽名 -->
-                    <div class="flex flex-col p-4 bg-white rounded-lg shadow-md border-t-4 border-green-500">
-                        <label class="font-bold text-green-600 mb-2">核對人 (Reviewer) 獨立確認</label>
-                        <p class="text-sm text-gray-500 mb-2">獨立核對並確認設定值與要求數值相符。</p>
-                        <input type="text" name="reviewer" id="reviewerInput" placeholder="選填：請輸入姓名/工號確認" class="p-2 border-b border-gray-300 bg-gray-50 focus:border-green-500">
-                        <div class="mt-3 text-xs text-gray-400">
-                            核對人最後更新: <span id="reviewerTimeDisplay" class="font-medium text-gray-700">N/A</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 結果欄位 -->
-                <div class="mt-6 p-4 bg-white rounded-lg shadow-md reviewer-field">
-                    <label class="font-bold text-gray-800 mb-2 block">最終核對結果</label>
-                    <select name="result" id="resultSelect" class="p-3 border border-gray-300 rounded-lg w-full text-lg font-semibold text-center focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value="">-- 請選擇 --</option>
-                        <option value="pass">✅ 核對通過 (可開始投放)</option>
-                        <option value="fail">❌ 核對不通過 (已暫停/需修正)</option>
-                    </select>
-                </div>
-                
-                <!-- 備註 -->
-                <div class="mt-6">
-                    <label for="notes" class="font-bold text-gray-800 mb-2 block">備註/修正說明</label>
-                    <textarea id="notes" name="notes" rows="3" placeholder="請填寫任何特殊情況或修正過程。" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-                </div>
-
-                <!-- 動作按鈕 -->
-                <div class="mt-8 flex flex-col sm:flex-row gap-4">
-                    <button type="submit" id="saveButton" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg disabled:bg-gray-400" disabled>
-                        💾 儲存 (請先登入)
-                    </button>
-                    <button type="button" id="newRecordButton" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg" disabled>
-                        ➕ 新增一筆新資料
-                    </button>
-                    <button type="button" id="exportButton" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl transition duration-150 shadow-lg" disabled>
-                        ⬇️ 匯出 Excel/CSV 表單
-                    </button>
-                </div>
-
-                <!-- 狀態訊息 -->
-                <div id="statusMessage" class="mt-4 p-3 rounded-lg text-center text-sm font-medium hidden"></div>
-
-            </div>
-        </form>
-        
-        <!-- 歷史記錄區塊 -->
-        <div id="historySection" class="p-6 sm:p-8 bg-gray-100 border-t border-gray-300 mt-4">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">歷史核對記錄</h2>
-            <div id="historyTableContainer" class="overflow-x-auto">
-                <p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>
-            </div>
-            <div id="historyStatus" class="mt-4 text-sm font-medium text-center text-gray-600"></div>
-        </div>
-        <!-- 底部提示 -->
-        <footer class="p-6 sm:p-8 bg-gray-800 text-white text-center text-sm">
-            <p>💡 提示：在每次設定或調整預算後，都必須執行此雙簽流程。</p>
-        </footer>
-
-    </div>
-
-    <!-- 管理員後台 Modal -->
-    <div id="adminPanel" class="hidden">
-        <div class="admin-content">
-            <h3 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">管理員後台 - 提升權限</h3>
-            <p class="text-sm text-gray-600 mb-4">只有管理員 (${lsiaobai@gmail.com}) 可以看到此面板並設置其他用戶為管理者。</p>
-            
-            <div id="userListContainer" class="max-h-80 overflow-y-auto border p-3 rounded-lg bg-gray-50">
-                <p class="text-center text-gray-500">載入用戶中...</p>
-            </div>
-            
-            <div class="mt-6 flex justify-end">
-                <button onclick="closeAdminPanel()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
-                    關閉
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        // --- 非模組腳本區塊 (純粹的 UI 輔助功能) ---
-        
-        // Function to calculate the number of days between two dates (inclusive)
-        function calculateDays(startDate, endDate) {
-            if (!startDate || !endDate) return 0;
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-
-            if (start > end) return 0;
-
-            const diffTime = Math.abs(end.getTime() - start.getTime());
-            
-            // Convert to days (add 1 for inclusive count)
-            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            
-            return diffDays;
-        }
-
-        // Function to handle the budget calculation
-        function calculateEstimatedBudget() {
-            const form = document.getElementById('checklistForm');
-            const budgetType = form.elements['adBudgetType'].value;
-            // 使用執行設定的金額 (targetAmount)
-            const dailyBudget = parseFloat(form.elements['targetAmount'].value); 
-            // 使用執行設定的日期 (targetStartDate/targetEndDate)
-            const startDate = form.elements['targetStartDate'].value;
-            const endDate = form.elements['targetEndDate'].value;
-            const resultEl = document.getElementById('calculatedResult');
-
-            resultEl.className = 'text-lg font-semibold w-full text-center sm:text-left'; // Reset classes
-            resultEl.classList.remove('text-red-600', 'text-green-700');
-
-            if (budgetType !== '日預算 (Daily Budget)') {
-                resultEl.textContent = '計算失敗：請選擇「日預算」類型進行計算。';
-                resultEl.classList.add('text-red-600');
-                return;
-            }
-
-            if (isNaN(dailyBudget) || dailyBudget <= 0) {
-                resultEl.textContent = '計算失敗：請輸入有效的「廣告活動預算金額 (執行設定)」。';
-                resultEl.classList.add('text-red-600');
-                return;
-            }
-
-            const days = calculateDays(startDate, endDate);
-
-            if (days <= 0) {
-                resultEl.textContent = '計算失敗：請選擇有效的「投放期間」執行設定日期範圍 (開始日需早於或等於結束日)。';
-                resultEl.classList.add('text-red-600');
-                return;
-            }
-
-            const estimatedTotal = dailyBudget * days;
-            
-            const formattedTotal = estimatedTotal.toLocaleString('zh-TW', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2
-            });
-
-            resultEl.textContent = `預估總花費（共 ${days} 天）：${formattedTotal}`;
-            resultEl.classList.add('text-green-700');
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-             document.getElementById('calculateBudgetButton').addEventListener('click', calculateEstimatedBudget);
-        });
-
-        // 為了讓 Modal 可以從 HTML 內聯調用
-        function closeAdminPanel() {
-            document.getElementById('adminPanel').style.display = 'none';
-        }
-
-    </script>
-    
-    <!-- FIREBASE 核心功能 (驗證, 儲存, 權限控管) -->
+    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            onSnapshot, 
-            serverTimestamp,
-            doc,
-            setDoc,
-            deleteDoc,
-            getDocs,
-            setLogLevel,
-            query,
+            getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc, query, orderBy, where
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+
+        // Global variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        // 應用程式初始化
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const analytics = getAnalytics(app);
         
-        // 設定 Firebase Debug Log
-        setLogLevel('Debug');
+        // -------------------------------------------------------------
+        // 全域狀態管理 (Global State Management)
+        // -------------------------------------------------------------
+        let currentUser = null; // 當前登入用戶的 Firebase User 對象
+        let userRole = 'guest'; // 用戶角色: guest, user, admin
+        let isAuthReady = false; // 驗證狀態是否準備就緒
+        let checklistData = []; // 歷史紀錄資料
+        const defaultAdminEmail = 'lsiaobai@gmail.com'; // 預設管理員 Email
 
-        // --- FIREBASE CONFIGURATION ---
-        // 請注意：這裡的配置應來自您的 Firebase 專案設定
-        const userFirebaseConfig = {
-            apiKey: "AIzaSyB7GaY2z3mKeD3bd9r_KVcd_VYMzz42c7c", 
-            authDomain: "budgetcheck-7a2e9.firebaseapp.com",
-            projectId: "budgetcheck-7a2e9",
-            storageBucket: "budgetcheck-7a2e9.firebasestorage.app", 
-            messagingSenderId: "1084663157523", 
-            appId: "1:1084663157523:web:4e8160c5c3da30f92380e6", 
-            measurementId: "G-81VM0XN7VC" 
-        };
-        // --- END CONFIGURATION ---
+        // 簡化路徑 (Simplified Paths to match the new Firestore Rules)
+        // 移除 'artifacts', appId 部分，使用 Project-Level 的共用路徑
+        const BUDGET_CHECKLIST_COLLECTION = 'public/data/budget_checklists';
+        const USER_ROLES_COLLECTION = 'public/data/user_roles';
 
-        // Global Firebase variables: 優先使用 Canvas 提供的設定，如果沒有則使用自定義設定
-        const canvasFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const canvasAppId = typeof __app_id !== 'undefined' ? __app_id : null;
-        
-        const configToUse = canvasFirebaseConfig || userFirebaseConfig;
-        const finalAppId = canvasAppId || userFirebaseConfig.projectId || 'default-external-app-id';
-        
-        // --- 應用程式狀態 ---
-        let app, db, auth;
-        let currentUser = null; // Firebase User Object
-        let userId = null;
-        let userEmail = null;
-        let isAdmin = false;
-        let checklistData = []; 
-        let editingId = null; 
-        let editMode = 'new'; // 'new', 'edit_executor', 'edit_reviewer'
+        // -------------------------------------------------------------
+        // 驗證與用戶狀態 (Authentication & User Status)
+        // -------------------------------------------------------------
 
-        // --- Firestore 路徑 ---
-        const CHECKLIST_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/budget_checklists`;
-        const USER_ROLES_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/user_roles`;
-        
-        // --- 管理者硬編碼郵箱 (預設管理者) ---
-        // 確保使用小寫進行穩定的比較
-        const DEFAULT_ADMIN_EMAIL = "lsiaobai@gmail.com".toLowerCase(); 
+        /**
+         * 檢查用戶角色並更新全域狀態
+         * @param {string} uid 用戶 UID
+         * @param {string} email 用戶 Email
+         */
+        async function checkUserRole(uid, email) {
+            if (!uid) {
+                userRole = 'guest';
+                return;
+            }
 
-        // --- 欄位分類 ---
-        const executorFields = [
-            'clientName', 'date', 'platform', 'verificationType', 'accountNameId',
-            'targetOriginalAccountBudget', 'targetAccountBudgetAfterTopUp', 
-            'adBudgetType', 'targetAmount', 'targetStartDate', 'targetEndDate',
-            'executor', 'notes'
-        ];
-        const reviewerFields = [
-            'actualOriginalAccountBudget', 'actualAccountBudgetAfterTopUp', 
-            'actualSet', 'actualStartDate', 'actualEndDate',
-            'reviewer', 'result'
-        ];
+            try {
+                // 1. 檢查是否為硬編碼的預設管理員
+                if (email && email.toLowerCase() === defaultAdminEmail.toLowerCase()) {
+                    userRole = 'admin';
+                }
 
-        // Utility function to show status messages
-        function showStatus(message, type = 'info', targetId = 'statusMessage') {
-            const status = document.getElementById(targetId);
-            status.textContent = message;
-            status.className = 'mt-4 p-3 rounded-lg text-center text-sm font-medium';
-            status.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700', 'bg-blue-100', 'text-blue-700', 'text-gray-600');
+                // 2. 檢查 Firestore 中的 user_roles 記錄
+                const roleDocRef = doc(db, USER_ROLES_COLLECTION, uid);
+                const roleSnapshot = await new Promise((resolve) => onSnapshot(roleDocRef, resolve));
 
-            if (type === 'error') {
-                status.classList.add('bg-red-100', 'text-red-700');
-            } else if (type === 'success') {
-                status.classList.add('bg-green-100', 'text-green-700');
-            } else if (type === 'info') {
-                 status.classList.add('bg-blue-100', 'text-blue-700');
-            } else {
-                status.classList.add('text-gray-600');
+                if (roleSnapshot.exists()) {
+                    const roleData = roleSnapshot.data();
+                    if (roleData.role === 'admin') {
+                        userRole = 'admin';
+                    } else if (roleData.role === 'user') {
+                        userRole = 'user';
+                    }
+                } else {
+                    // 如果用戶角色文檔不存在，則新增一個預設為 'user' 的文檔
+                    // 但如果是預設管理員，則新增 'admin' 文檔
+                    const newRole = (userRole === 'admin') ? 'admin' : 'user';
+                    await setDoc(roleDocRef, { 
+                        role: newRole, 
+                        email: email || 'N/A', 
+                        uid: uid,
+                        createdAt: new Date()
+                    }, { merge: true });
+                    userRole = newRole;
+                }
+
+                // 3. 更新最後登入時間 (Last Login)
+                await setDoc(roleDocRef, { lastLogin: new Date() }, { merge: true });
+
+            } catch (error) {
+                console.error("檢查/設定用戶角色失敗:", error);
+                document.getElementById('admin-error').textContent = `載入用戶列表失敗: ${error.message}`;
+                userRole = 'user'; // 預設為一般用戶以確保基本功能可用
             }
         }
-        
-        // --- 驗證與權限核心邏輯 ---
 
-        async function googleSignIn() {
+        /**
+         * 處理 Firebase 驗證狀態變更
+         */
+        onAuthStateChanged(auth, async (user) => {
+            currentUser = user;
+            if (user) {
+                const userEmail = user.email || 'N/A';
+                document.getElementById('auth-status').innerHTML = `<span class="font-bold">${userEmail}</span> (${userRole === 'admin' ? '管理員' : '一般用戶'})`;
+                document.getElementById('login-button').classList.add('hidden');
+                document.getElementById('logout-button').classList.remove('hidden');
+                document.getElementById('admin-button').classList.add('hidden'); // 先隱藏
+
+                await checkUserRole(user.uid, userEmail);
+
+                // 重新渲染UI以應用新的角色
+                renderUI(); 
+                
+                // 載入歷史紀錄 (確保在角色檢查之後執行)
+                if (isAuthReady) {
+                    loadChecklists(); 
+                }
+
+            } else {
+                currentUser = null;
+                userRole = 'guest';
+                document.getElementById('auth-status').textContent = '請登入';
+                document.getElementById('login-button').classList.remove('hidden');
+                document.getElementById('logout-button').classList.add('hidden');
+                document.getElementById('admin-button').classList.add('hidden');
+                document.getElementById('checklist-history').innerHTML = `<p class="text-center text-gray-500 py-10">請先登入以查看共享歷史記錄。</p>`;
+            }
+            isAuthReady = true;
+        });
+
+        /**
+         * 觸發 Google 登入
+         */
+        window.signInWithGoogle = async () => {
             const provider = new GoogleAuthProvider();
             try {
                 await signInWithPopup(auth, provider);
-                // onAuthStateChanged 會處理後續的 UI 更新和資料載入
             } catch (error) {
-                console.error("Google Sign-In Failed:", error);
-                let errorMessage = `❌ Google 登入失敗: ${error.message}`;
-                if (error.code === 'auth/unauthorized-domain') {
-                    errorMessage = `❌ Google 登入失敗: Firebase: Error (${error.code})。請至您的 Firebase Console -> Authentication -> Settings -> Authorized domains，將此應用程式的運行網域加入白名單。`;
-                }
-                showStatus(errorMessage, 'error', 'authStatus');
+                console.error("Google 登入失敗:", error);
+                document.getElementById('auth-error').textContent = `Google 登入失敗: Firebase: Error (${error.code || error.message}). 請確認 Firebase Authorized domains 設定是否正確。`;
+                document.getElementById('auth-error').classList.remove('hidden');
             }
-        }
-
-        async function googleSignOut() {
-            try {
-                await signOut(auth);
-            } catch (error) {
-                console.error("Sign Out Failed:", error);
-            }
-        }
+        };
 
         /**
-         * 檢查用戶角色並儲存/更新到 Firestore
+         * 登出
          */
-        async function checkUserRole(user) {
-            if (!db || !user) {
-                isAdmin = false;
-                return;
-            }
-            
-            const roleDocRef = doc(db, USER_ROLES_COLLECTION_PATH, user.uid);
-            
-            // 確保 email 存在並轉換為小寫，以進行穩定的比較
-            const lowerCaseEmail = user.email ? user.email.toLowerCase() : '';
-            
-            try {
-                // 嘗試從 Firestore 獲取角色資訊
-                const roleSnapshot = await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH))); 
-                let foundRole = roleSnapshot.docs.find(d => d.id === user.uid)?.data();
-                
-                // 1. 檢查是否為預設管理者 (硬編碼)
-                if (lowerCaseEmail === DEFAULT_ADMIN_EMAIL) {
-                    isAdmin = true;
-                    // 確保預設管理者在 user_roles 中有記錄且角色正確
-                    if (!foundRole || foundRole.role !== 'admin' || foundRole.email.toLowerCase() !== lowerCaseEmail) {
-                        await setDoc(roleDocRef, { 
-                            email: user.email, 
-                            role: 'admin',
-                            lastLogin: serverTimestamp() 
-                        }, { merge: true });
-                    }
-                } else if (foundRole) {
-                    // 2. 檢查是否有已設定的角色
-                    isAdmin = foundRole.role === 'admin';
-                    // 更新登入時間
-                     await setDoc(roleDocRef, { 
-                        lastLogin: serverTimestamp() 
-                    }, { merge: true });
-                } else {
-                    // 3. 預設為一般使用者 (並記錄)
-                    isAdmin = false;
-                    await setDoc(roleDocRef, { 
-                        email: user.email, 
-                        role: 'user',
-                        lastLogin: serverTimestamp() 
-                    }, { merge: true });
-                }
+        window.signOutUser = () => {
+            signOut(auth);
+            document.getElementById('auth-error').classList.add('hidden');
+            userRole = 'guest';
+            renderUI();
+        };
 
-                console.log(`User ${user.email} role: ${isAdmin ? 'Admin' : 'User'}`);
-            } catch (e) {
-                console.error("Error checking user role:", e);
-                // 發生錯誤時，至少檢查是否為硬編碼管理者
-                isAdmin = (lowerCaseEmail === DEFAULT_ADMIN_EMAIL); 
-            }
-        }
+        // -------------------------------------------------------------
+        // 資料庫操作 (Database Operations)
+        // -------------------------------------------------------------
 
         /**
-         * 處理身份驗證狀態改變
+         * 監聽並載入歷史紀錄
          */
-        function handleAuthStateChange(user) {
-            const authButton = document.getElementById('authButton');
-            const userEmailDisplay = document.getElementById('userEmailDisplay');
-            const adminPanelButton = document.getElementById('adminPanelButton');
-            
-            currentUser = user;
-            
-            if (user) {
-                userId = user.uid;
-                // 修正 user.email 可能為 null 的問題，並確保用於顯示
-                userEmail = user.email || '未提供 Email'; 
-                
-                // 清除登入錯誤提示
-                showStatus('', 'info', 'authStatus');
-
-                document.getElementById('loadingIndicator').classList.remove('hidden');
-
-                // 檢查角色
-                checkUserRole(user).then(() => {
-                    // 更新 UI 狀態
-                    authButton.textContent = '登出';
-                    authButton.onclick = googleSignOut;
-                    
-                    // 修正 userEmail 顯示 null 的問題
-                    userEmailDisplay.innerHTML = `**${userEmail}** (${isAdmin ? '管理者' : '一般用戶'})`;
-                    document.getElementById('checklistForm').classList.remove('hidden');
-                    
-                    
-                    document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false);
-
-                    if (isAdmin) {
-                        adminPanelButton.classList.remove('hidden');
-                        adminPanelButton.onclick = openAdminPanel;
-                    } else {
-                         adminPanelButton.classList.add('hidden');
-                    }
-                    
-                    loadChecklists(); // 登入後載入資料
-                    document.getElementById('loadingIndicator').classList.add('hidden');
-
-                }).catch(e => {
-                    console.error("Role check failed:", e);
-                    showStatus(`角色檢查失敗: ${e.message}。請檢查 Firestore 規則。`, 'error');
-                    document.getElementById('loadingIndicator').classList.add('hidden');
-                });
-
-            } else {
-                // 未登入狀態
-                userId = null;
-                userEmail = null;
-                isAdmin = false;
-                authButton.textContent = '登入 Google';
-                authButton.onclick = googleSignIn;
-                userEmailDisplay.innerHTML = '請登入 Google';
-                document.getElementById('checklistForm').classList.add('hidden');
-                document.getElementById('historyTableContainer').innerHTML = '<p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>';
-                document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true);
-                adminPanelButton.classList.add('hidden');
-                document.getElementById('loadingIndicator').classList.add('hidden');
-                showStatus("您已登出。", 'info');
-            }
-        }
-        
-        // --- 表單流程控制 ---
-
-        /**
-         * 根據當前模式 (新增/修改執行/檢核) 鎖定或解鎖欄位
-         */
-        function setFormMode(mode, currentCreatorId = null) {
-            editMode = mode;
-            const form = document.getElementById('checklistForm');
-            const saveButton = document.getElementById('saveButton');
-            const isCreator = currentCreatorId === userId;
-            
-            // 1. 執行人 (executor) 欄位控制
-            form.querySelectorAll('.executor-field input, .executor-field select').forEach(el => {
-                const isExecutorModifiable = (mode === 'new' || (mode === 'edit_executor' && isCreator));
-                el.disabled = !isExecutorModifiable;
-                // 新增資料或修改執行資料時，必填欄位才需要 required 屬性
-                if (executorFields.includes(el.name) && ['clientName', 'date', 'accountNameId', 'executor'].includes(el.name)) {
-                    el.required = (mode === 'new' || mode === 'edit_executor');
-                }
-            });
-
-            // 2. 檢核人 (reviewer) 欄位控制
-            form.querySelectorAll('.reviewer-field input, .reviewer-field select').forEach(el => {
-                const isReviewerModifiable = (mode === 'edit_reviewer' && !isCreator);
-                el.disabled = !isReviewerModifiable;
-                // 檢核資料時，檢核人姓名和結果是必填
-                if (el.name === 'reviewer' || el.name === 'result') {
-                    el.required = mode === 'edit_reviewer';
-                }
-            });
-            
-            // 3. 基本資料欄位 (Creator only)
-            // 這些欄位必須放在 executorFields 內進行統一控制
-            form.elements['clientName'].disabled = (mode !== 'new' && !isCreator);
-            form.elements['date'].disabled = (mode !== 'new' && !isCreator);
-            form.elements['platform'].disabled = (mode !== 'new' && !isCreator);
-            form.elements['verificationType'].disabled = (mode !== 'new' && !isCreator);
-            form.elements['accountNameId'].disabled = (mode !== 'new' && !isCreator);
-
-            // 4. 備註欄位 (Notes) - 兩邊都可以寫，所以統一解鎖
-            form.elements['notes'].disabled = false;
-            
-            // 5. 更新按鈕文字
-            if (mode === 'new') {
-                document.getElementById('formTitle').textContent = "廣告活動與預算細節 (新增執行設定)";
-                saveButton.textContent = "💾 儲存執行設定 (建立新紀錄)";
-                saveButton.disabled = false;
-            } else if (mode === 'edit_executor') {
-                document.getElementById('formTitle').textContent = `廣告活動與預算細節 (修改執行設定)`;
-                saveButton.textContent = "🔄 更新執行設定";
-                saveButton.disabled = false;
-            } else if (mode === 'edit_reviewer') {
-                document.getElementById('formTitle').textContent = `廣告活動與預算細節 (進行檢核)`;
-                saveButton.textContent = "✅ 儲存檢核結果";
-                saveButton.disabled = false;
-            }
-        }
-
-        // Reset the form and editing state
-        function resetForm() {
-            document.getElementById('checklistForm').reset();
-            editingId = null;
-            
-            // 清空時間戳記顯示
-            document.getElementById('executorTimeDisplay').textContent = 'N/A';
-            document.getElementById('reviewerTimeDisplay').textContent = 'N/A';
-            
-            setFormMode('new'); // 切換回新增模式
-            
-            // Clear calculation result
-            document.getElementById('calculatedResult').textContent = '（點擊按鈕進行計算）'; 
-            document.getElementById('calculatedResult').classList.remove('text-red-600', 'text-green-700');
-            showStatus("已清空表單，您可以新增一筆新資料。", 'info');
-        }
-
-        // Function to collect form data
-        function collectFormData() {
-            const form = document.getElementById('checklistForm');
-            
-            if (!form.checkValidity()) {
-                showStatus("錯誤：請檢查並填寫所有標註星號的必填欄位。", 'error');
-                return null;
-            }
-            
-            let dataToSave = {};
-
-            if (editMode === 'new') {
-                // 新增模式：只收集 Executor 欄位 + 創建資訊
-                dataToSave = {
-                    ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
-                    createdByUserId: userId,
-                    creatorEmail: userEmail,
-                    executionTimestamp: serverTimestamp(), // 建立時即為執行時間
-                    reviewTimestamp: null, // 檢核時間為空
-                };
-            } else if (editMode === 'edit_executor') {
-                // 修改執行模式：只允許修改 Executor 欄位 + 更新時間
-                dataToSave = {
-                    ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
-                    // notes 已包含在 executorFields 內
-                    executionTimestamp: serverTimestamp(), // 更新執行時間
-                };
-            } else if (editMode === 'edit_reviewer') {
-                 // 修改檢核模式：只允許修改 Reviewer 欄位 + 更新時間
-                dataToSave = {
-                    // 必須包含所有 Reviewer 欄位
-                    ...reviewerFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
-                    notes: form.elements['notes'].value, // 備註可修改
-                    reviewer: form.elements['reviewer'].value, // 檢核人必填
-                    result: form.elements['result'].value, // 結果必填
-                    reviewTimestamp: serverTimestamp(), // 更新檢核時間
-                };
-
-                // 檢核結果為「不通過」時阻止儲存 (前端提示)
-                if (dataToSave.result === 'fail') {
-                    showStatus("錯誤：核對結果為「不通過」，請先修正並將結果改為「通過」或在備註說明後再儲存。", 'error');
-                    return null;
-                }
-            }
-            
-            return dataToSave;
-        }
-
-        // Save (Add or Update) to Firestore
-        async function saveChecklist(event) {
-            event.preventDefault(); 
-            if (!db || !userId) {
-                 showStatus("❌ 儲存失敗: 請先登入。", 'error');
-                 return;
-            }
-            
-            const data = collectFormData();
-            if (!data) return;
-            
-            // 新增資料時，使用 addDoc (Firestore 自動產生 ID)
-            const path = CHECKLIST_COLLECTION_PATH;
-            const docRef = editingId ? doc(db, path, editingId) : collection(db, path);
-
-            try {
-                if (editingId) {
-                    // Update existing document using setDoc (Firestore Rules will check permissions)
-                    await setDoc(doc(db, path, editingId), data, { merge: true });
-                    showStatus(`✅ 核對結果已成功更新 (${editMode})。`, 'success');
-                } else {
-                    // Add new document
-                    await addDoc(docRef, data);
-                    showStatus("✅ 執行設定已成功儲存並建立新紀錄。", 'success');
-                }
-                resetForm(); // Reset form after successful save/update
-                
-            } catch (e) {
-                console.error("Error saving document: ", e);
-                // 這裡會捕獲 'Missing or insufficient permissions.' 錯誤
-                showStatus(`❌ 儲存失敗: ${e.message}。請檢查您的 Firestore 安全規則！`, 'error');
-            }
-        }
-
-        // Load data using onSnapshot (and re-render the history table)
         function loadChecklists() {
-            if (!db || !userId) return;
-            const path = CHECKLIST_COLLECTION_PATH;
-            const q = collection(db, path); 
+            if (!currentUser) return;
+
+            const checklistRef = collection(db, BUDGET_CHECKLIST_COLLECTION);
+            const q = query(checklistRef, orderBy("date", "desc"));
 
             onSnapshot(q, (snapshot) => {
                 checklistData = snapshot.docs.map(doc => {
                     const data = doc.data();
-                    const formatTimestamp = (ts) => ts?.toDate()?.toLocaleString('zh-TW') || 'N/A';
+                    // 將 Firestore Timestamp 轉換為可讀的日期格式
+                    const executionTimestampDisplay = data.executionTimestamp ? new Date(data.executionTimestamp.toDate()).toLocaleString() : 'N/A';
+                    const reviewTimestampDisplay = data.reviewTimestamp ? new Date(data.reviewTimestamp.toDate()).toLocaleString() : 'N/A';
+                    
                     return {
                         id: doc.id,
                         ...data,
-                        executionTimestampDisplay: formatTimestamp(data.executionTimestamp),
-                        reviewTimestampDisplay: formatTimestamp(data.reviewTimestamp),
+                        executionTimestampDisplay,
+                        reviewTimestampDisplay
                     };
-                }).sort((a, b) => {
-                    // 優先按執行時間倒序排列
-                    const tsA = b.executionTimestampDisplay !== 'N/A' ? new Date(b.executionTimestampDisplay) : new Date(0);
-                    const tsB = a.executionTimestampDisplay !== 'N/A' ? new Date(a.executionTimestampDisplay) : new Date(0);
-                    return tsA - tsB;
-                }); 
-
-                showStatus(`💾 已載入 ${checklistData.length} 筆歷史核對記錄。`, 'info', 'historyStatus');
-                renderHistoryTable(); 
+                });
+                renderChecklistHistory(checklistData);
+                document.getElementById('history-error').classList.add('hidden');
             }, (error) => {
-                console.error("Error listening to collection: ", error);
-                showStatus(`❌ 載入歷史記錄失敗: ${error.message}。請檢查 Firestore 規則是否允許讀取。`, 'error', 'historyStatus');
+                console.error("載入歷史記錄失敗:", error);
+                document.getElementById('history-error').textContent = `❌ 載入歷史記錄失敗: ${error.message}。請檢查 Firestore 規則是否允許讀取。`;
+                document.getElementById('history-error').classList.remove('hidden');
             });
         }
 
-        // Delete a record
-        async function deleteChecklist(id) {
-            if (!db || !isAdmin) {
-                showStatus("❌ 刪除失敗: 只有管理者可以刪除資料。", 'error', 'historyStatus');
+        /**
+         * 儲存或更新核對記錄
+         * @param {Object} formData 表單資料
+         * @param {string|null} docId 文件ID，如果為null則新增
+         */
+        async function saveChecklist(formData, docId = null) {
+            if (!currentUser) {
+                alert('請先登入以執行操作。');
                 return;
             }
-            
-            if (!confirm("確定要刪除這筆記錄嗎？此操作無法復原。")) return;
-            
-            const path = CHECKLIST_COLLECTION_PATH;
-            const docRef = doc(db, path, id);
-            
+
             try {
-                // 執行刪除操作
-                await deleteDoc(docRef);
-                showStatus("🗑️ 記錄已成功刪除。", 'success', 'historyStatus');
-                // onSnapshot 會自動更新列表，無需手動修改 checklistData
-                if (editingId === id) {
-                    resetForm();
-                }
-            } catch (e) {
-                console.error("Error deleting document: ", e);
-                // 捕獲刪除失敗的錯誤，可能是權限不足 (Missing or insufficient permissions)
-                showStatus(`❌ 刪除失敗: ${e.message}。請檢查您的 Firestore 規則，確保管理者有 delete 權限。`, 'error', 'historyStatus');
-            }
-        }
-
-        // Start editing/reviewing a record
-        function startEditOrReview(id, mode) {
-            const item = checklistData.find(d => d.id === id);
-            if (!item) {
-                showStatus(`找不到 ID 為 ${id} 的記錄。`, 'error');
-                return;
-            }
-            
-            const form = document.getElementById('checklistForm');
-            // 1. 填充表單
-            for (const key in item) {
-                if (form.elements[key]) {
-                    form.elements[key].value = item[key] || '';
-                }
-            }
-            
-            // 填充簽核時間
-            document.getElementById('executorTimeDisplay').textContent = item.executionTimestampDisplay;
-            document.getElementById('reviewerTimeDisplay').textContent = item.reviewTimestampDisplay;
-
-            // 2. 更新編輯狀態
-            editingId = id;
-            setFormMode(mode, item.createdByUserId);
-
-            // 3. 滾動到表單頂部
-            document.getElementById('formTitle').scrollIntoView({ behavior: 'smooth' });
-
-            // 4. 重設計算結果
-            document.getElementById('calculatedResult').textContent = '（點擊按鈕進行重新計算）'; 
-            document.getElementById('calculatedResult').classList.remove('text-red-600', 'text-green-700');
-        }
-
-        // Render the history table
-        function renderHistoryTable() {
-            const container = document.getElementById('historyTableContainer');
-            if (checklistData.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 p-4 text-center">目前沒有歷史核對記錄。</p>';
-                return;
-            }
-
-            let html = `
-                <table class="w-full text-sm text-left text-gray-700 bg-white shadow-md rounded-lg overflow-hidden">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3">帳號/客戶名稱</th>
-                            <th scope="col" class="px-6 py-3">執行人</th> 
-                            <th scope="col" class="px-6 py-3">檢核人</th>
-                            <th scope="col" class="px-6 py-3">結果</th>
-                            <th scope="col" class="px-6 py-3">最後執行時間</th>
-                            <th scope="col" class="px-6 py-3">最後檢核時間</th>
-                            <th scope="col" class="px-6 py-3">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            checklistData.forEach(item => {
-                const statusClass = item.result === 'pass' ? 'text-green-600 bg-green-50' : (item.result === 'fail' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50');
-                const statusText = item.result === 'pass' ? '✅ 通過' : (item.result === 'fail' ? '❌ 不通過' : '⚪ 待檢核');
+                // 移除空的檢核時間戳記，避免儲存為 null
+                if (!formData.reviewTimestamp) delete formData.reviewTimestamp;
+                if (!formData.executionTimestamp) delete formData.executionTimestamp;
                 
-                // 判斷操作按鈕
-                const isCreator = item.createdByUserId === userId;
-                let actionButton;
-
-                if (isCreator) {
-                    // Creator can always edit their own executor fields
-                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_executor')" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">修改</button>`;
-                } else if (item.result !== 'pass' && item.result !== 'fail') {
-                    // Others (Reviewer) can review if the result is pending
-                    actionButton = `<button onclick="window.startEditOrReview('${item.id}', 'edit_reviewer')" class="text-green-600 hover:text-green-900 font-medium mr-3">檢核</button>`;
+                if (docId) {
+                    // 更新現有文件
+                    const docRef = doc(db, BUDGET_CHECKLIST_COLLECTION, docId);
+                    await updateDoc(docRef, formData);
+                    console.log('文件更新成功:', docId);
                 } else {
-                    // Everyone can view completed records (no action needed)
-                    actionButton = `<span class="text-gray-500">已完成</span>`;
+                    // 新增文件
+                    const newDocRef = collection(db, BUDGET_CHECKLIST_COLLECTION);
+                    const docToSave = {
+                        ...formData,
+                        createdByUserId: currentUser.uid,
+                        creatorEmail: currentUser.email,
+                        reviewTimestamp: null // 新增時檢核時間為空
+                    };
+                    await addDoc(newDocRef, docToSave);
+                    console.log('文件新增成功');
                 }
+                
+                document.getElementById('save-success').classList.remove('hidden');
+                document.getElementById('save-error').classList.add('hidden');
+                setTimeout(() => document.getElementById('save-success').classList.add('hidden'), 3000);
 
-                // Admin only delete button
-                let deleteButton = '';
-                if (isAdmin) {
-                    deleteButton = `<button onclick="window.deleteChecklist('${item.id}')" class="text-red-600 hover:text-red-900 font-medium ml-3">刪除</button>`;
+            } catch (error) {
+                console.error("儲存失敗:", error);
+                document.getElementById('save-error').textContent = `❌ 儲存失敗: ${error.message}`;
+                document.getElementById('save-error').classList.remove('hidden');
+                setTimeout(() => document.getElementById('save-error').classList.add('hidden'), 5000);
+            }
+        }
+
+        /**
+         * 刪除核對記錄 (僅限管理員)
+         * @param {string} docId 文件ID
+         */
+        window.deleteChecklist = async (docId) => {
+            if (userRole !== 'admin') {
+                alert('只有管理員可以刪除記錄。');
+                return;
+            }
+            
+            // 使用自定義的確認視窗 (避免使用 window.confirm)
+            const confirmDeleteModal = document.getElementById('confirmDeleteModal');
+            document.getElementById('confirmDeleteText').textContent = '確定要永久刪除此筆記錄嗎？';
+            confirmDeleteModal.style.display = 'block';
+
+            document.getElementById('confirmDeleteBtn').onclick = async () => {
+                confirmDeleteModal.style.display = 'none';
+                try {
+                    const docRef = doc(db, BUDGET_CHECKLIST_COLLECTION, docId);
+                    await deleteDoc(docRef);
+                    // onSnapshot 會自動更新 UI
+                    console.log('文件刪除成功:', docId);
+                } catch (error) {
+                    console.error("刪除失敗:", error);
+                    alert(`刪除失敗: ${error.message}`);
                 }
+            };
 
+            document.getElementById('cancelDeleteBtn').onclick = () => {
+                confirmDeleteModal.style.display = 'none';
+            };
+        };
 
-                html += `
-                    <tr class="bg-white border-b hover:bg-gray-50">
-                        <td class="px-6 py-4 font-medium text-gray-900">
-                            ${item.clientName}<br>
-                            <span class="text-xs text-gray-500">${item.accountNameId || 'N/A'}</span>
+        // -------------------------------------------------------------
+        // UI 渲染與互動 (UI Rendering & Interaction)
+        // -------------------------------------------------------------
+        
+        /**
+         * 渲染UI元素，例如管理員按鈕
+         */
+        function renderUI() {
+            // 更新用戶狀態顯示
+            const userEmail = currentUser ? currentUser.email || 'N/A' : 'N/A';
+            const statusText = currentUser ? `<span class="font-bold">${userEmail}</span> (${userRole === 'admin' ? '管理員' : '一般用戶'})` : '請登入';
+            document.getElementById('auth-status').innerHTML = statusText;
+
+            // 顯示/隱藏管理員按鈕
+            const adminButton = document.getElementById('admin-button');
+            if (userRole === 'admin') {
+                adminButton.classList.remove('hidden');
+            } else {
+                adminButton.classList.add('hidden');
+            }
+        }
+        
+        /**
+         * 將歷史紀錄渲染到表格中
+         * @param {Array<Object>} data 歷史紀錄陣列
+         */
+        function renderChecklistHistory(data) {
+            const historyTableBody = document.getElementById('history-table-body');
+            historyTableBody.innerHTML = '';
+            
+            if (data.length === 0) {
+                document.getElementById('checklist-history').innerHTML = `<p class="text-center text-gray-500 py-10">尚無歷史記錄。</p>`;
+                return;
+            }
+
+            data.forEach(item => {
+                const isCreator = currentUser && item.createdByUserId === currentUser.uid;
+                
+                // 決定操作按鈕
+                let actionButton;
+                if (isCreator) {
+                    // 建立者：只有「修改」權限 (只能修改左側)
+                    actionButton = `
+                        <button onclick="window.openEditModal('${item.id}', 'executor')" 
+                                class="action-button bg-blue-500 hover:bg-blue-600 text-white shadow-md">
+                            修改 (執行設定)
+                        </button>
+                    `;
+                } else if (currentUser && item.createdByUserId !== currentUser.uid) {
+                    // 其他使用者：只有「檢核」權限 (只能修改右側)
+                    actionButton = `
+                        <button onclick="window.openEditModal('${item.id}', 'reviewer')" 
+                                class="action-button bg-green-500 hover:bg-green-600 text-white shadow-md">
+                            檢核 (檢核設定)
+                        </button>
+                    `;
+                } else {
+                    // 未登入：只有「查看」
+                    actionButton = `
+                        <button onclick="window.openEditModal('${item.id}', 'view')" 
+                                class="action-button bg-gray-500 hover:bg-gray-600 text-white shadow-md">
+                            查看
+                        </button>
+                    `;
+                }
+                
+                // 決定刪除按鈕
+                const deleteButton = (userRole === 'admin') ? `
+                    <button onclick="window.deleteChecklist('${item.id}')" 
+                            class="action-button bg-red-500 hover:bg-red-600 text-white ml-2 shadow-md">
+                        刪除
+                    </button>
+                ` : '';
+
+                // 判斷檢核結果的顏色
+                const resultColor = item.result === '通過' ? 'bg-green-100 text-green-800' : 
+                                    item.result === '不通過' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800';
+
+                const row = `
+                    <tr class="hover:bg-gray-50 transition duration-150">
+                        <td class="font-medium">${item.accountNameId || 'N/A'}</td>
+                        <td class="date-col">${item.date || 'N/A'}</td>
+                        <td>${item.platform || 'N/A'}</td>
+                        <td>${item.verificationType || 'N/A'}</td>
+                        <td class="font-semibold">NT$ ${item.targetAmount ? item.targetAmount.toLocaleString() : 'N/A'}</td>
+                        <td>
+                            <span class="px-3 py-1 text-sm font-semibold rounded-full ${resultColor}">${item.result || '待檢核'}</span>
                         </td>
-                        <td class="px-6 py-4 font-medium text-gray-900">${item.executor || 'N/A'}</td>
-                        <td class="px-6 py-4 font-medium text-gray-900">${item.reviewer || 'N/A'}</td> 
-                        <td class="px-6 py-4">
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded ${statusClass}">
-                                ${statusText}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-xs">${item.executionTimestampDisplay}</td>
-                        <td class="px-6 py-4 text-xs">${item.reviewTimestampDisplay}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td>${item.creatorEmail || 'N/A'}</td>
+                        <td>${item.executionTimestampDisplay}</td>
+                        <td>${item.reviewTimestampDisplay}</td>
+                        <td class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                             ${actionButton}
                             ${deleteButton}
                         </td>
                     </tr>
                 `;
+                historyTableBody.innerHTML += row;
             });
-
-            html += `
-                    </tbody>
-                </table>
-            `;
-            container.innerHTML = html;
         }
         
-        // --- 管理員後台功能 ---
+        /**
+         * 打開編輯/檢核/查看 modal
+         * @param {string|null} docId 編輯的文件ID，null表示新增
+         * @param {string} mode 'new', 'executor', 'reviewer', 'view'
+         */
+        window.openEditModal = (docId = null, mode = 'new') => {
+            const modal = document.getElementById('checklistModal');
+            const form = document.getElementById('checklistForm');
+            const leftInputs = form.querySelectorAll('[data-group="executor"]');
+            const rightInputs = form.querySelectorAll('[data-group="reviewer"]');
+            const saveButton = document.getElementById('modalSaveBtn');
 
-        async function openAdminPanel() {
-            if (!isAdmin) return;
-            document.getElementById('adminPanel').style.display = 'flex';
+            // 1. 重置表單和錯誤訊息
+            form.reset();
+            document.getElementById('modalTitle').textContent = docId ? (mode === 'executor' ? '修改 (執行設定)' : mode === 'reviewer' ? '檢核 (檢核設定)' : '查看紀錄') : '新增核對資料 (執行設定)';
+            document.getElementById('docIdField').value = docId || '';
+            document.getElementById('modal-error').classList.add('hidden');
             
-            const userListContainer = document.getElementById('userListContainer');
-            userListContainer.innerHTML = '<p class="text-center text-gray-500">載入用戶中...</p>';
-
-            try {
-                // 確保從最新的數據庫狀態獲取角色
-                const q = collection(db, USER_ROLES_COLLECTION_PATH);
-                const querySnapshot = await getDocs(q);
-                
-                let userListHtml = '';
-                querySnapshot.forEach(docSnapshot => {
-                    const docId = docSnapshot.id;
-                    const userData = docSnapshot.data();
-                    const currentIsAdminRole = userData.role === 'admin';
-                    const isCurrentUser = docId === userId;
-                    const isDefaultAdmin = userData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL;
-
-                    // 權限變更按鈕
-                    const toggleButtonText = currentIsAdminRole ? '降級為一般用戶' : '升級為管理者';
-                    const toggleButtonColor = currentIsAdminRole ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600';
-                    let toggleButtonDisabled = isCurrentUser ? 'disabled' : ''; // 無法修改自己的權限
-                    if (isDefaultAdmin && currentIsAdminRole) {
-                        // 預設管理者無法被降級
-                        toggleButtonDisabled = 'disabled';
-                    }
-
-                    const toggleButtonClass = toggleButtonDisabled ? 'opacity-50 cursor-not-allowed' : '';
-                    const userRoleText = currentIsAdminRole ? '管理者' : '一般用戶';
-
-                    // 移除角色記錄按鈕 (移除 Firestore 中的 user_roles 記錄)
-                    const removeButton = !isCurrentUser && !isDefaultAdmin ? 
-                        `<button onclick="window.removeUserRoleRecord('${docId}')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-bold py-1 px-2 rounded-lg transition duration-150 ml-2">移除記錄</button>` 
-                        : '';
-
-                    userListHtml += `
-                        <div class="flex items-center justify-between p-3 border-b">
-                            <div>
-                                <p class="font-medium text-gray-900 break-all">${userData.email} 
-                                    ${isDefaultAdmin ? '<span class="text-xs text-yellow-600">(預設管理員)</span>' : ''}
-                                </p>
-                                <p class="text-sm text-gray-500">ID: ${docId.substring(0, 8)}... (${userRoleText})</p>
-                            </div>
-                            <div class="flex items-center">
-                                <button 
-                                    id="roleBtn-${docId}"
-                                    onclick="window.toggleUserRole('${docId}', '${currentIsAdminRole}')"
-                                    class="${toggleButtonColor} text-white text-xs font-bold py-1 px-2 rounded-lg transition duration-150 ${toggleButtonClass}"
-                                    ${toggleButtonDisabled}>
-                                    ${isCurrentUser ? '自己的權限' : toggleButtonText}
-                                </button>
-                                ${removeButton}
-                            </div>
-                        </div>
-                    `;
-                });
-
-                userListContainer.innerHTML = userListHtml || '<p class="text-center text-gray-500">目前沒有其他用戶記錄。</p>';
-
-            } catch (e) {
-                userListContainer.innerHTML = `<p class="text-red-500">載入用戶列表失敗: ${e.message}</p>`;
-                console.error("Error loading user roles:", e);
+            // 2. 根據模式設定欄位狀態
+            let isEditable = true;
+            let currentTimestampField = 'executionTimestamp';
+            
+            if (mode === 'new') {
+                // 新增：只能填左側
+                leftInputs.forEach(input => input.disabled = false);
+                rightInputs.forEach(input => input.disabled = true);
+                saveButton.textContent = '儲存核對結果';
+                saveButton.classList.remove('hidden');
+            } else if (mode === 'executor') {
+                // 執行人修改：只能修改左側
+                leftInputs.forEach(input => input.disabled = false);
+                rightInputs.forEach(input => input.disabled = true);
+                saveButton.textContent = '更新執行設定';
+                currentTimestampField = 'executionTimestamp';
+                saveButton.classList.remove('hidden');
+            } else if (mode === 'reviewer') {
+                // 檢核人修改：只能修改右側
+                leftInputs.forEach(input => input.disabled = true);
+                rightInputs.forEach(input => input.disabled = false);
+                saveButton.textContent = '更新檢核設定';
+                currentTimestampField = 'reviewTimestamp';
+                saveButton.classList.remove('hidden');
+            } else if (mode === 'view') {
+                // 查看：全部禁用
+                leftInputs.forEach(input => input.disabled = true);
+                rightInputs.forEach(input => input.disabled = true);
+                saveButton.classList.add('hidden');
+                isEditable = false;
             }
-        }
-        
-        async function toggleUserRole(targetUserId, currentIsAdminString) {
-            if (!isAdmin) return;
             
-            const currentIsAdmin = currentIsAdminString === 'true';
-            const newRole = currentIsAdmin ? 'user' : 'admin';
-            const roleDocRef = doc(db, USER_ROLES_COLLECTION_PATH, targetUserId);
+            // 3. 載入資料 (如果 docId 存在)
+            if (docId) {
+                const item = checklistData.find(d => d.id === docId);
+                if (item) {
+                    Object.keys(item).forEach(key => {
+                        const input = form.elements[key];
+                        if (input) {
+                            if (input.type === 'date' && typeof item[key] === 'object' && item[key].toDate) {
+                                // 處理 Firestore Timestamp 轉 Date
+                                input.value = item[key].toDate().toISOString().split('T')[0];
+                            } else {
+                                input.value = item[key] || '';
+                            }
+                        }
+                    });
+                }
+            }
 
-            try {
-                // 確保無法降級預設管理者
-                const targetUserData = (await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH)))).docs.find(d => d.id === targetUserId)?.data();
-                if (targetUserData && targetUserData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL && newRole === 'user') {
-                     showStatus(`❌ 權限變更失敗: 無法將預設管理員降級。`, 'error', 'historyStatus');
-                     return;
+            // 4. 設定儲存按鈕的點擊事件
+            saveButton.onclick = async (e) => {
+                e.preventDefault();
+                
+                const data = new FormData(form);
+                const formData = {};
+                for (const [key, value] of data.entries()) {
+                    // 處理空字串轉為 null 或數字轉換
+                    if (value === '') {
+                        formData[key] = null;
+                    } else if (key.includes('Budget') || key === 'targetAmount') {
+                        // 嘗試將預算相關欄位轉換為數字
+                        formData[key] = parseFloat(value) || 0;
+                    } else {
+                        formData[key] = value;
+                    }
+                }
+                
+                // 只有在可編輯模式下才更新時間戳記
+                if (isEditable) {
+                    formData[currentTimestampField] = new Date();
                 }
 
-                await setDoc(roleDocRef, { role: newRole }, { merge: true });
-                showStatus(`✅ 用戶 ${targetUserId.substring(0, 8)}... 已成功設置為 ${newRole === 'admin' ? '管理者' : '一般用戶'}。`, 'success', 'historyStatus');
-                openAdminPanel(); // 重新載入列表
-            } catch (e) {
-                showStatus(`❌ 權限變更失敗: ${e.message}`, 'error', 'historyStatus');
-            }
-        }
+                try {
+                    // 根據模式只傳送允許更新的欄位
+                    let updates = {};
+                    const allKeys = Object.keys(formData);
+                    
+                    if (mode === 'executor') {
+                        const executorKeys = ['clientName', 'date', 'platform', 'verificationType', 'accountNameId', 
+                                              'targetOriginalAccountBudget', 'targetAccountBudgetAfterTopUp', 
+                                              'adBudgetType', 'targetAmount', 'targetStartDate', 'targetEndDate',
+                                              'executor', 'notes', 'executionTimestamp'];
+                        executorKeys.forEach(key => {
+                            if (allKeys.includes(key)) updates[key] = formData[key];
+                        });
+                    } else if (mode === 'reviewer') {
+                        const reviewerKeys = ['actualOriginalAccountBudget', 'actualAccountBudgetAfterTopUp', 
+                                              'actualSet', 'actualStartDate', 'actualEndDate',
+                                              'reviewer', 'result', 'notes', 'reviewTimestamp'];
+                        reviewerKeys.forEach(key => {
+                            if (allKeys.includes(key)) updates[key] = formData[key];
+                        });
+                    } else {
+                        // 新增模式
+                        updates = formData;
+                    }
+                    
+                    await saveChecklist(updates, docId);
+                    modal.style.display = 'none'; // 儲存成功後關閉視窗
 
-        async function removeUserRoleRecord(targetUserId) {
-             if (!isAdmin) return;
+                } catch (error) {
+                    console.error("儲存表單資料失敗:", error);
+                    document.getElementById('modal-error').textContent = `❌ 儲存失敗: ${error.message}`;
+                    document.getElementById('modal-error').classList.remove('hidden');
+                }
+            };
 
-            // 確保無法移除自己的角色記錄或預設管理者的記錄
-            const targetUserData = (await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH)))).docs.find(d => d.id === targetUserId)?.data();
-            if (targetUserId === userId) {
-                 showStatus(`❌ 移除記錄失敗: 無法移除自己的角色記錄。`, 'error', 'historyStatus');
-                 return;
-            }
-            if (targetUserData && targetUserData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL) {
-                 showStatus(`❌ 移除記錄失敗: 無法移除預設管理員的角色記錄。`, 'error', 'historyStatus');
-                 return;
-            }
+            modal.style.display = 'block';
+        };
 
-            if (!confirm(`確定要移除用戶 ${targetUserId.substring(0, 8)}... 在 Firestore 中的角色記錄嗎？這將使他變回一般用戶。`)) return;
+        /**
+         * 關閉任一 modal
+         * @param {string} modalId 視窗 ID
+         */
+        window.closeModal = (modalId) => {
+            document.getElementById(modalId).style.display = 'none';
+        };
 
-            const roleDocRef = doc(db, USER_ROLES_COLLECTION_PATH, targetUserId);
+        // -------------------------------------------------------------
+        // 管理員後台 (Admin Panel)
+        // -------------------------------------------------------------
 
+        /**
+         * 打開管理員面板
+         */
+        window.openAdminPanel = async () => {
+            if (userRole !== 'admin') return;
+
+            const adminModal = document.getElementById('adminModal');
+            const userListBody = document.getElementById('userListBody');
+            userListBody.innerHTML = '<tr><td colspan="4" class="text-center py-4">載入中...</td></tr>';
+            
             try {
-                await deleteDoc(roleDocRef);
-                showStatus(`🗑️ 用戶 ${targetUserId.substring(0, 8)}... 的角色記錄已移除。`, 'success', 'historyStatus');
-                openAdminPanel(); // 重新載入列表
-            } catch (e) {
-                showStatus(`❌ 移除角色記錄失敗: ${e.message}`, 'error', 'historyStatus');
+                // 載入 user_roles 集合中的所有用戶
+                const userRef = collection(db, USER_ROLES_COLLECTION);
+                const q = query(userRef, orderBy("email", "asc"));
+
+                const snapshot = await new Promise((resolve) => onSnapshot(q, resolve));
+
+                userListBody.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const userData = doc.data();
+                    const isDefaultAdmin = userData.email && userData.email.toLowerCase() === defaultAdminEmail.toLowerCase();
+                    
+                    const row = `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2">${userData.email || 'N/A'}</td>
+                            <td class="px-4 py-2">${userData.uid}</td>
+                            <td class="px-4 py-2">
+                                <span class="px-3 py-1 text-xs font-semibold rounded-full ${userData.role === 'admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800'}">
+                                    ${userData.role === 'admin' ? '管理員' : '一般用戶'}
+                                </span>
+                            </td>
+                            <td class="px-4 py-2">
+                                ${isDefaultAdmin ? '預設管理員 (無法移除)' : 
+                                    (userData.role === 'admin' ? 
+                                        `<button onclick="window.removeAdminRole('${userData.uid}')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 text-sm rounded-lg shadow-md">
+                                            移除管理員
+                                        </button>` 
+                                    : 
+                                        `<button onclick="window.grantAdminRole('${userData.uid}')" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 text-sm rounded-lg shadow-md">
+                                            提升為管理員
+                                        </button>`)
+                                }
+                            </td>
+                        </tr>
+                    `;
+                    userListBody.innerHTML += row;
+                });
+                
+                document.getElementById('admin-error').classList.add('hidden');
+            } catch (error) {
+                console.error("載入管理員後台資料失敗:", error);
+                document.getElementById('admin-error').textContent = `❌ 載入用戶列表失敗: ${error.message}`;
+                document.getElementById('admin-error').classList.remove('hidden');
             }
-        }
 
+            adminModal.style.display = 'block';
+        };
 
-        // --- 全域函數暴露 (供 HTML 內聯調用) ---
-        window.startEditOrReview = startEditOrReview;
-        window.deleteChecklist = deleteChecklist;
-        window.resetForm = resetForm;
-        window.toggleUserRole = toggleUserRole;
-        window.removeUserRoleRecord = removeUserRoleRecord; // 新增移除功能
-        window.closeAdminPanel = closeAdminPanel;
-        
-        // --- 初始化 ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-
+        /**
+         * 提升用戶為管理員
+         * @param {string} uid 用戶 UID
+         */
+        window.grantAdminRole = async (uid) => {
+            if (userRole !== 'admin') return;
             try {
-                app = initializeApp(configToUse);
-                db = getFirestore(app);
-                auth = getAuth(app);
-            } catch (e) {
-                console.error("Firebase Initialization Failed:", e);
-                showStatus(`❌ 連線錯誤: ${e.message}。請檢查您的 Firebase 配置。`, 'error', 'loadingIndicator');
-                return;
+                const docRef = doc(db, USER_ROLES_COLLECTION, uid);
+                await updateDoc(docRef, { role: 'admin' });
+                window.openAdminPanel(); // 重新載入面板
+            } catch (error) {
+                alert(`提升權限失敗: ${error.message}`);
+                console.error("提升權限失敗:", error);
             }
-            
-            // 設定登入/登出監聽器
-            onAuthStateChanged(auth, handleAuthStateChange);
-            
-            // 表單事件
-            document.getElementById('checklistForm').addEventListener('submit', saveChecklist);
-            document.getElementById('newRecordButton').addEventListener('click', () => { window.resetForm(); });
-            document.getElementById('exportButton').addEventListener('click', exportToCSV);
-            
-            // 首次載入時，將表單設置為新增模式的預設狀態
-            setFormMode('new'); 
-        });
-        
-        // Export to CSV function (must be defined in module scope to access checklistData)
-        function exportToCSV() {
+        };
+
+        /**
+         * 移除用戶的管理員角色 (降級為一般用戶)
+         * @param {string} uid 用戶 UID
+         */
+        window.removeAdminRole = async (uid) => {
+            if (userRole !== 'admin') return;
+            try {
+                const docRef = doc(db, USER_ROLES_COLLECTION, uid);
+                await updateDoc(docRef, { role: 'user' });
+                window.openAdminPanel(); // 重新載入面板
+            } catch (error) {
+                alert(`降級權限失敗: ${error.message}`);
+                console.error("降級權限失敗:", error);
+            }
+        };
+
+        // -------------------------------------------------------------
+        // 資料匯出 (Data Export)
+        // -------------------------------------------------------------
+
+        /**
+         * 將歷史紀錄匯出為 CSV 檔案
+         */
+        window.exportToCSV = () => {
             if (checklistData.length === 0) {
-                showStatus("🚫 沒有可匯出的記錄。", 'error');
+                alert('沒有數據可以匯出。');
                 return;
             }
 
-            // 1. 定義 CSV 標頭 
+            // 1. 定義 CSV 標頭
             const headers = [
-                "客戶名稱", "建立/修改日期", "廣告平台", "檢核類型", "帳號名稱/帳號ID", // 新欄位
-                "原帳戶執行設定預算", "原帳戶檢核設定預算", "加值後執行設定預算", "加值後檢核設定預算", 
-                "廣告預算類型", "廣告活動執行設定金額", "廣告活動檢核設定金額", 
-                "執行設定開始日期", "執行設定結束日期", "檢核設定開始日期", "檢核設定結束日期", 
-                "執行人", "核對人", "核對結果", "備註", 
-                "最後執行時間", "最後檢核時間", // 新增時間戳記
-                "建立者User ID", "建立者Email" // 新增創建者資訊
+                '客戶名稱', '日期', '平台', '檢核項目', '帳號名稱/帳號ID', 
+                '目標 - 原始帳戶預算', '目標 - 儲值後帳戶預算', '廣告預算類型', '目標 - 儲值金額', 
+                '目標 - 預計起始日', '目標 - 預計結束日', '執行人', 
+                '實際 - 原始帳戶預算', '實際 - 儲值後帳戶預算', '實際 - 儲值是否成功', 
+                '實際 - 起始日', '實際 - 結束日', '檢核人', '檢核結果', '備註/修正說明', 
+                '執行時間', '檢核時間', '建立者UID', '建立者Email'
             ];
-            
-            // 2. Map data to header order
-            const csvRows = [
-                headers.join(',')
-            ];
+            const csvRows = [headers.join(',')];
 
+            // 2. 處理數據行
             checklistData.forEach(item => {
                 const row = [
-                    item.clientName, 
-                    item.date, 
-                    item.platform, 
-                    item.verificationType, 
-                    item.accountNameId, // 新欄位
-                    item.targetOriginalAccountBudget, 
-                    item.actualOriginalAccountBudget, 
-                    item.targetAccountBudgetAfterTopUp, 
-                    item.actualAccountBudgetAfterTopUp, 
-                    item.adBudgetType, 
-                    item.targetAmount, 
-                    item.actualSet, 
-                    item.targetStartDate || '', 
-                    item.targetEndDate || '',   
-                    item.actualStartDate || '', 
-                    item.actualEndDate || '',   
-                    item.executor, 
-                    item.reviewer, 
-                    item.result, 
+                    item.clientName,
+                    item.date,
+                    item.platform,
+                    item.verificationType,
+                    item.accountNameId,
+                    item.targetOriginalAccountBudget || 0,
+                    item.targetAccountBudgetAfterTopUp || 0,
+                    item.adBudgetType,
+                    item.targetAmount || 0,
+                    item.targetStartDate,
+                    item.targetEndDate,
+                    item.executor,
+                    item.actualOriginalAccountBudget || 0,
+                    item.actualAccountBudgetAfterTopUp || 0,
+                    item.actualSet,
+                    item.actualStartDate,
+                    item.actualEndDate,
+                    item.reviewer,
+                    item.result,
+                    // 處理備註中的換行符和逗號
                     `"${item.notes ? item.notes.replace(/"/g, '""').replace(/\n/g, ' ') : ''}"`,
                     item.executionTimestampDisplay, // 執行時間
                     item.reviewTimestampDisplay, // 檢核時間
@@ -1203,7 +728,8 @@
                 csvRows.push(row.map(cell => {
                     // 確保逗號被處理
                     let cellString = String(cell);
-                    if (cellString.includes(',')) {
+                    // 檢查是否包含逗號或已經是備註欄位 (備註已經處理過，所以這裡主要處理其他欄位)
+                    if (cellString.includes(',') && !cellString.startsWith('"')) {
                         cellString = `"${cellString.replace(/"/g, '""')}"`;
                     }
                     return cellString;
@@ -1221,9 +747,320 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            showStatus("⬇️ 歷史紀錄已匯出為 CSV 檔案。", 'success');
-        }
+            URL.revokeObjectURL(url);
+        };
 
     </script>
+
+    <!-- 頂部標題和驗證狀態 -->
+    <header class="bg-indigo-600 text-white p-6 rounded-t-xl shadow-lg mb-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <h1 class="text-3xl font-bold mb-2 sm:mb-0">廣告預算核對雙簽表</h1>
+            <div class="flex items-center space-x-3">
+                <span id="auth-status" class="text-sm italic">請登入</span>
+                <button id="login-button" onclick="signInWithGoogle()" 
+                        class="bg-white text-indigo-600 px-4 py-2 rounded-full font-semibold shadow-md hover:bg-gray-100 transition duration-150 hidden">
+                    登入 Google
+                </button>
+                <button id="logout-button" onclick="signOutUser()" 
+                        class="bg-white text-red-600 px-4 py-2 rounded-full font-semibold shadow-md hover:bg-red-100 transition duration-150 hidden">
+                    登出
+                </button>
+            </div>
+        </div>
+        <p class="text-indigo-200 mt-1">Campaign Budget Verification Checklist (C-BVC) - 權限管控版</p>
+        <p class="text-indigo-300 mt-2 text-sm">此表單用於確保所有預算設定經過兩層次核對，防止超支錯誤。</p>
+        <p id="auth-error" class="text-yellow-300 bg-red-800 p-2 rounded-lg mt-3 hidden text-sm font-medium"></p>
+    </header>
+
+    <!-- 主表單容器 -->
+    <main class="bg-white p-6 rounded-b-xl shadow-lg mb-6">
+        
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800">核對資料填寫區</h2>
+            <button id="admin-button" onclick="openAdminPanel()" 
+                    class="action-button bg-yellow-500 hover:bg-yellow-600 text-white shadow-md hidden">
+                管理員後台
+            </button>
+        </div>
+
+        <form id="checklistForm" class="space-y-6">
+            <!-- 隱藏欄位用於儲存文件ID -->
+            <input type="hidden" id="docIdField" name="id">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 checklist-grid">
+                
+                <!-- 左側：執行設定 (Executor Settings) -->
+                <div class="p-4 border border-indigo-200 rounded-lg bg-indigo-50">
+                    <h3 class="text-xl font-bold text-indigo-700 mb-4 border-b pb-2">執行設定 (Execution Settings)</h3>
+                    
+                    <div class="space-y-3">
+                        <label class="block">客戶名稱: <input type="text" name="clientName" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                        <label class="block">日期: <input type="date" name="date" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                        <label class="block">平台: <select name="platform" data-group="executor" required class="w-full p-2 border rounded-md">
+                            <option value="">選擇平台</option>
+                            <option value="Google Ads">Google Ads</option>
+                            <option value="Meta Ads">Meta Ads</option>
+                            <option value="Line Ads">Line Ads</option>
+                            <option option="Other">其他</option>
+                        </select></label>
+                        <label class="block">檢核項目: <select name="verificationType" data-group="executor" required class="w-full p-2 border rounded-md">
+                            <option value="">選擇項目</option>
+                            <option value="新增/調整預算">新增/調整預算</option>
+                            <option value="活動上線">活動上線</option>
+                            <option value="其他設定">其他設定</option>
+                        </select></label>
+                        <label class="block font-bold">帳號名稱/帳號ID: <input type="text" name="accountNameId" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                        
+                        <hr class="my-4 border-indigo-100">
+                        
+                        <label class="block">目標 - 原始帳戶預算 (NT$): <input type="number" name="targetOriginalAccountBudget" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                        <label class="block">目標 - 儲值後帳戶預算 (NT$): <input type="number" name="targetAccountBudgetAfterTopUp" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                        
+                        <label class="block">廣告預算類型: <select name="adBudgetType" data-group="executor" required class="w-full p-2 border rounded-md">
+                            <option value="">選擇類型</option>
+                            <option value="儲值金額">儲值金額</option>
+                            <option value="日預算">日預算</option>
+                            <option value="活動預算">活動預算</option>
+                        </select></label>
+                        <label class="block font-bold">目標 - 儲值/設定金額 (NT$): <input type="number" name="targetAmount" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                        
+                        <label class="block">目標 - 預計起始日: <input type="date" name="targetStartDate" data-group="executor" class="w-full p-2 border rounded-md"></label>
+                        <label class="block">目標 - 預計結束日: <input type="date" name="targetEndDate" data-group="executor" class="w-full p-2 border rounded-md"></label>
+                        
+                        <label class="block">執行人 (姓名/Email): <input type="text" name="executor" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                    </div>
+                </div>
+
+                <!-- 右側：檢核設定 (Reviewer Settings) -->
+                <div class="p-4 border border-green-200 rounded-lg bg-green-50">
+                    <h3 class="text-xl font-bold text-green-700 mb-4 border-b pb-2">檢核設定 (Review Settings)</h3>
+
+                    <div class="space-y-3">
+                        <label class="block">實際 - 原始帳戶預算 (NT$): <input type="number" name="actualOriginalAccountBudget" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+                        <label class="block">實際 - 儲值後帳戶預算 (NT$): <input type="number" name="actualAccountBudgetAfterTopUp" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+
+                        <label class="block">實際 - 儲值/設定是否成功: <select name="actualSet" data-group="reviewer" class="w-full p-2 border rounded-md">
+                            <option value="">選擇結果</option>
+                            <option value="成功">成功</option>
+                            <option value="失敗">失敗</option>
+                            <option value="不適用">不適用</option>
+                        </select></label>
+                        
+                        <label class="block">實際 - 起始日: <input type="date" name="actualStartDate" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+                        <label class="block">實際 - 結束日: <input type="date" name="actualEndDate" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+                        
+                        <label class="block">檢核人 (姓名/Email): <input type="text" name="reviewer" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+                        
+                        <label class="block font-bold">檢核結果: <select name="result" data-group="reviewer" class="w-full p-2 border rounded-md">
+                            <option value="">選擇檢核結果</option>
+                            <option value="通過">通過</option>
+                            <option value="不通過">不通過</option>
+                            <option value="待處理">待處理</option>
+                        </select></label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 備註/修正說明 (通用欄位) -->
+            <div class="mt-6 p-4 border rounded-lg">
+                <label class="block text-lg font-semibold mb-2">備註/修正說明 (兩方皆可填寫):</label>
+                <textarea name="notes" rows="3" class="w-full p-2 border rounded-md" placeholder="請填寫任何特殊情況或修正過程。"></textarea>
+            </div>
+        </form>
+        
+        <!-- 操作按鈕和狀態訊息 -->
+        <div class="mt-8 flex justify-center space-x-4">
+            <button onclick="window.openEditModal()" 
+                    class="action-button bg-gray-600 hover:bg-gray-700 text-white shadow-xl">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                新增一筆新資料
+            </button>
+            <button onclick="window.exportToCSV()" 
+                    class="action-button bg-green-500 hover:bg-green-600 text-white shadow-xl">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                匯出 Excel/CSV 表單
+            </button>
+        </div>
+
+        <!-- 儲存狀態訊息 -->
+        <div id="save-success" class="mt-6 p-3 bg-green-100 text-green-700 border-l-4 border-green-500 rounded-lg hidden" role="alert">
+            ✓ 儲存成功！
+        </div>
+        <div id="save-error" class="mt-6 p-3 bg-red-100 text-red-700 border-l-4 border-red-500 rounded-lg hidden" role="alert">
+            ❌ 儲存失敗: Missing or insufficient permissions.
+        </div>
+    </main>
+
+    <!-- 歷史紀錄區 -->
+    <section id="checklist-history" class="mt-8 p-6 bg-white rounded-xl shadow-lg">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">歷史核對記錄 (所有用戶共享)</h2>
+        <p id="history-error" class="p-3 bg-red-100 text-red-700 border-l-4 border-red-500 rounded-lg hidden mb-4" role="alert"></p>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full checklist-table">
+                <thead>
+                    <tr>
+                        <th>帳號名稱/帳號ID</th>
+                        <th class="date-col">日期</th>
+                        <th>平台</th>
+                        <th>檢核項目</th>
+                        <th>目標金額</th>
+                        <th>檢核結果</th>
+                        <th>執行人 Email</th>
+                        <th>執行時間</th>
+                        <th>檢核時間</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="history-table-body">
+                    <!-- 紀錄將由 JavaScript 渲染到此 -->
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Modal for 新增/編輯/檢核 -->
+    <div id="checklistModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h2 id="modalTitle" class="text-2xl font-bold text-indigo-700">新增核對資料 (執行設定)</h2>
+                <span onclick="closeModal('checklistModal')" class="text-gray-500 hover:text-gray-700 text-3xl cursor-pointer">&times;</span>
+            </div>
+            
+            <form id="modalChecklistForm" class="space-y-6">
+                <!-- 欄位與主表單共用，但在這裡重新載入以確保獨立性 -->
+                <!-- 這裡使用主表單的結構，JS會在 openEditModal 時填充或重置 -->
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 checklist-grid">
+                
+                    <!-- 左側：執行設定 -->
+                    <div class="p-4 border border-indigo-200 rounded-lg bg-indigo-50">
+                        <h3 class="text-xl font-bold text-indigo-700 mb-4 border-b pb-2">執行設定</h3>
+                        <div class="space-y-3">
+                            <label class="block">客戶名稱: <input type="text" name="clientName" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                            <label class="block">日期: <input type="date" name="date" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                            <label class="block">平台: <select name="platform" data-group="executor" required class="w-full p-2 border rounded-md">
+                                <option value="">選擇平台</option><option value="Google Ads">Google Ads</option><option value="Meta Ads">Meta Ads</option><option value="Line Ads">Line Ads</option><option option="Other">其他</option>
+                            </select></label>
+                            <label class="block">檢核項目: <select name="verificationType" data-group="executor" required class="w-full p-2 border rounded-md">
+                                <option value="">選擇項目</option><option value="新增/調整預算">新增/調整預算</option><option value="活動上線">活動上線</option><option value="其他設定">其他設定</option>
+                            </select></label>
+                            <label class="block font-bold">帳號名稱/帳號ID: <input type="text" name="accountNameId" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                            
+                            <hr class="my-4 border-indigo-100">
+                            
+                            <label class="block">目標 - 原始帳戶預算 (NT$): <input type="number" name="targetOriginalAccountBudget" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                            <label class="block">目標 - 儲值後帳戶預算 (NT$): <input type="number" name="targetAccountBudgetAfterTopUp" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                            
+                            <label class="block">廣告預算類型: <select name="adBudgetType" data-group="executor" required class="w-full p-2 border rounded-md">
+                                <option value="">選擇類型</option><option value="儲值金額">儲值金額</option><option value="日預算">日預算</option><option value="活動預算">活動預算</option>
+                            </select></label>
+                            <label class="block font-bold">目標 - 儲值/設定金額 (NT$): <input type="number" name="targetAmount" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                            
+                            <label class="block">目標 - 預計起始日: <input type="date" name="targetStartDate" data-group="executor" class="w-full p-2 border rounded-md"></label>
+                            <label class="block">目標 - 預計結束日: <input type="date" name="targetEndDate" data-group="executor" class="w-full p-2 border rounded-md"></label>
+                            
+                            <label class="block">執行人 (姓名/Email): <input type="text" name="executor" data-group="executor" required class="w-full p-2 border rounded-md"></label>
+                        </div>
+                    </div>
+
+                    <!-- 右側：檢核設定 -->
+                    <div class="p-4 border border-green-200 rounded-lg bg-green-50">
+                        <h3 class="text-xl font-bold text-green-700 mb-4 border-b pb-2">檢核設定</h3>
+
+                        <div class="space-y-3">
+                            <label class="block">實際 - 原始帳戶預算 (NT$): <input type="number" name="actualOriginalAccountBudget" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+                            <label class="block">實際 - 儲值後帳戶預算 (NT$): <input type="number" name="actualAccountBudgetAfterTopUp" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+
+                            <label class="block">實際 - 儲值/設定是否成功: <select name="actualSet" data-group="reviewer" class="w-full p-2 border rounded-md">
+                                <option value="">選擇結果</option><option value="成功">成功</option><option value="失敗">失敗</option><option value="不適用">不適用</option>
+                            </select></label>
+                            
+                            <label class="block">實際 - 起始日: <input type="date" name="actualStartDate" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+                            <label class="block">實際 - 結束日: <input type="date" name="actualEndDate" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+                            
+                            <label class="block">檢核人 (姓名/Email): <input type="text" name="reviewer" data-group="reviewer" class="w-full p-2 border rounded-md"></label>
+                            
+                            <label class="block font-bold">檢核結果: <select name="result" data-group="reviewer" class="w-full p-2 border rounded-md">
+                                <option value="">選擇檢核結果</option><option value="通過">通過</option><option value="不通過">不通過</option><option value="待處理">待處理</option>
+                            </select></label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 備註/修正說明 (通用欄位) -->
+                <div class="mt-6 p-4 border rounded-lg">
+                    <label class="block text-lg font-semibold mb-2">備註/修正說明:</label>
+                    <textarea name="notes" rows="3" class="w-full p-2 border rounded-md" placeholder="請填寫任何特殊情況或修正過程。"></textarea>
+                </div>
+
+                <!-- 隱藏欄位用於傳遞ID -->
+                <input type="hidden" name="id" id="docIdField">
+                
+                <p id="modal-error" class="p-2 bg-red-100 text-red-700 border-l-4 border-red-500 rounded-lg hidden text-sm" role="alert">錯誤訊息</p>
+
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button type="button" onclick="closeModal('checklistModal')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg font-semibold">
+                        取消/關閉
+                    </button>
+                    <button type="button" id="modalSaveBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold">
+                        儲存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for 管理員後台 -->
+    <div id="adminModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h2 class="text-2xl font-bold text-indigo-700">管理員後台 - 用戶權限管理</h2>
+                <span onclick="closeModal('adminModal')" class="text-gray-500 hover:text-gray-700 text-3xl cursor-pointer">&times;</span>
+            </div>
+
+            <p id="admin-error" class="p-2 bg-red-100 text-red-700 border-l-4 border-red-500 rounded-lg hidden text-sm mb-4" role="alert">錯誤訊息</p>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">UID</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">角色</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userListBody" class="bg-white divide-y divide-gray-200">
+                        <!-- 用戶列表將由 JavaScript 渲染到此 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="flex justify-end mt-4">
+                <button type="button" onclick="closeModal('adminModal')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg font-semibold">
+                    關閉
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for 刪除確認 -->
+    <div id="confirmDeleteModal" class="modal">
+        <div class="modal-content max-w-sm">
+            <h2 class="text-xl font-bold text-red-600 mb-4">確認刪除</h2>
+            <p id="confirmDeleteText" class="mb-6">確定要永久刪除此筆記錄嗎？</p>
+            <div class="flex justify-end space-x-3">
+                <button id="cancelDeleteBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg font-semibold">
+                    取消
+                </button>
+                <button id="confirmDeleteBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold">
+                    確定刪除
+                </button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
