@@ -434,7 +434,7 @@
     </script>
     
     <!-- FIREBASE 核心功能 (驗證, 儲存, 權限控管) -->
-   <script type="module">
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { 
@@ -449,16 +449,16 @@
         setLogLevel,
         query,
         orderBy,
-        getDoc, // 讀取單一文件需要
-        updateDoc, // 更新文件需要
-        Timestamp, // 檢查時間戳類型需要
+        getDoc, 
+        updateDoc, 
+        Timestamp,
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     
     // 設定 Firebase Debug Log
     setLogLevel('Debug');
 
     // --------------------------------------------------
-    // 1. 請在這裡填寫您的 Firebase 設定 (重要!)
+    // 1. 請在這裡填寫您的 Firebase 設定物件 (重要!)
     // --------------------------------------------------
     const firebaseConfig = {
         apiKey: "YOUR_API_KEY",
@@ -482,7 +482,6 @@
     // 輔助函數：格式化時間戳
     function formatTimestamp(timestamp) {
         if (!timestamp) return 'N/A';
-        // 檢查是否為 Firebase Timestamp 物件，並轉換為 Date
         const date = timestamp instanceof Timestamp 
                     ? timestamp.toDate() 
                     : new Date(timestamp);
@@ -496,12 +495,10 @@
     }
 
     // =================================================================
-    // 2. 資料載入函數 (V9 修復)
+    // 2. 資料載入函數 (時序修復)
     // =================================================================
 
-    // 載入歷史記錄
     function loadHistoryChecklists() {
-        // 修正路徑: collection("public") -> doc("data") -> collection("budget_checklists")
         const collectionRef = collection(doc(db, "public", "data"), "budget_checklists");
         
         document.getElementById("historyMessage").innerText = "正在載入歷史記錄..."; 
@@ -518,7 +515,6 @@
             });
     }
 
-    // 載入用戶列表 (管理者後台)
     function loadUserRoles() {
         const collectionRef = collection(doc(db, "public", "data"), "user_roles");
         
@@ -537,7 +533,7 @@
 
 
     // =================================================================
-    // 3. 歷史記錄相關函數 (V9 修復)
+    // 3. 歷史記錄相關函數 (V9 修復 + 公開)
     // =================================================================
 
     function displayHistoryChecklists(querySnapshot) {
@@ -548,8 +544,6 @@
         querySnapshot.forEach(doc => {
             const data = doc.data();
             data.id = doc.id;
-            
-            // 格式化時間戳
             data.executionTimestampDisplay = formatTimestamp(data.executionTimestamp);
             data.reviewTimestampDisplay = formatTimestamp(data.reviewTimestamp);
 
@@ -598,6 +592,7 @@
 
     function createActionButton(item) {
         if (isAdminUser) {
+            // 注意：這裡呼叫的 deleteChecklist 會指向 window.deleteChecklist
             return `<button onclick="deleteChecklist('${item.id}')" class="text-red-600 hover:text-red-900 ml-2">刪除</button>`;
         } else if (!item.reviewerEmail && currentUserId === item.createdByUserId) {
             return `<button onclick="editChecklist('${item.id}')" class="text-indigo-600 hover:text-indigo-900">編輯/重新送出</button>`;
@@ -609,7 +604,8 @@
         return '';
     }
 
-    function reviewChecklist(id) {
+    // 將函數掛載到 window，供 HTML 內聯事件調用
+    window.reviewChecklist = (id) => {
         const item = allChecklistData.find(d => d.id === id);
         if (!item) return;
 
@@ -618,12 +614,11 @@
 
         const result = confirm("請確認檢核結果：點擊『確定』表示通過 (Pass)，『取消』表示不通過 (Fail)") ? 'Pass' : 'Fail';
 
-        // V9: 使用 updateDoc
         const docRef = doc(db, "public", "data", "budget_checklists", id);
         updateDoc(docRef, {
             result: result,
             notes: notes,
-            reviewTimestamp: serverTimestamp(), // V9: serverTimestamp()
+            reviewTimestamp: serverTimestamp(), 
             reviewer: currentUserEmail
         })
         .then(() => {
@@ -635,14 +630,14 @@
             console.error("檢核送出失敗:", error);
         });
     }
-
-    function deleteChecklist(id) {
+    
+    // 將函數掛載到 window，供 HTML 內聯事件調用
+    window.deleteChecklist = (id) => {
         if (!isAdminUser) {
             alert("您沒有權限執行刪除操作。");
             return;
         }
         if (confirm("警告：您確定要永久刪除此筆記錄嗎？")) {
-            // V9: 使用 deleteDoc
             deleteDoc(doc(db, "public", "data", "budget_checklists", id))
                 .then(() => {
                     alert("記錄已刪除。");
@@ -655,7 +650,8 @@
         }
     }
 
-    function downloadCSV() {
+    // 將函數掛載到 window，供 HTML 內聯事件調用
+    window.downloadCSV = () => {
         const header = [
             'ID', '專案名稱', '廣告帳戶', '日期', '預算檢查', '執行人', '檢核人', 
             '檢核結果', '備註', '執行時間', '檢核時間', '建立者UID', '建立者Email'
@@ -665,21 +661,14 @@
 
         allChecklistData.forEach(item => {
             const row = [
-                item.id,
-                `\"${item.project || ''}\"`,
-                `\"${item.account || ''}\"`,
-                item.date || '',
-                item.isBudgetChecked ? '是' : '否',
-                item.creatorEmail || '',
-                item.reviewerEmail || '',
+                item.id, `\"${item.project || ''}\"`, `\"${item.account || ''}\"`,
+                item.date || '', item.isBudgetChecked ? '是' : '否',
+                item.creatorEmail || '', item.reviewerEmail || '',
                 item.result || '', 
                 `\"${item.notes ? item.notes.replace(/\"/g, '\"\"').replace(/\\n/g, ' ') : ''}\"`,
-                item.executionTimestampDisplay || '', 
-                item.reviewTimestampDisplay || '', 
-                item.createdByUserId || '', 
-                item.creatorEmail || ''
+                item.executionTimestampDisplay || '', item.reviewTimestampDisplay || '', 
+                item.createdByUserId || '', item.creatorEmail || ''
             ];
-            // 處理 CSV 中的逗號和換行符
             csvRows.push(row.map(cell => {
                 let cellString = String(cell);
                 if (cellString.includes(',') || cellString.includes('"') || cellString.includes('\n')) {
@@ -690,8 +679,6 @@
         });
 
         const csvString = csvRows.join('\n');
-        
-        // 建立 Blob 並下載 (加入 BOM 解決中文亂碼問題)
         const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -701,10 +688,14 @@
         link.click();
         document.body.removeChild(link);
     }
+    
+    // (您的 editChecklist 和 viewChecklist 函數也應該被公開，這裡假設它們是空的或您稍後會添加)
+    window.editChecklist = (id) => { alert(`編輯功能 ${id} (尚未實作)`); }
+    window.viewChecklist = (id) => { alert(`查看功能 ${id} (尚未實作)`); }
 
 
     // =================================================================
-    // 4. 管理者後台相關函數 (V9 修復)
+    // 4. 管理者後台相關函數 (V9 修復 + 公開)
     // =================================================================
 
     function displayUserList(querySnapshot) {
@@ -715,6 +706,7 @@
             const user = doc.data();
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
+            // 注意：這裡呼叫的 updateUserRole 會指向 window.updateUserRole
             tr.innerHTML = `
                 <td class="whitespace-nowrap">${doc.id}</td>
                 <td class="whitespace-nowrap">${user.role || 'user'}</td>
@@ -729,13 +721,13 @@
         });
     }
 
-    function updateUserRole(userId, newRole) {
+    // 將函數掛載到 window，供 HTML 內聯事件調用
+    window.updateUserRole = (userId, newRole) => {
         if (!isAdminUser) {
             alert("您沒有權限修改用戶角色。");
             return;
         }
         
-        // V9: 使用 setDoc
         setDoc(doc(db, "public", "data", "user_roles", userId), {
             role: newRole
         }, { merge: true })
@@ -751,17 +743,15 @@
 
 
     // =================================================================
-    // 5. 檢查管理員狀態的輔助函數 (V9 修復)
+    // 5. 檢查管理員狀態的輔助函數 (V9 修復時序)
     // =================================================================
 
     function checkUserAdminStatus(uid) {
-        // V9: 使用 getDoc
         getDoc(doc(db, "public", "data", "user_roles", uid))
             .then(docSnap => {
                 if (docSnap.exists() && docSnap.data().role === 'admin') {
                     isAdminUser = true;
                     document.getElementById("adminPanel").style.display = "block";
-                    
                     loadUserRoles(); 
                 } else {
                     isAdminUser = false;
@@ -776,25 +766,27 @@
     }
 
     // =================================================================
-    // 6. 核心登入/登出邏輯 (V9 修復時序問題)
+    // 6. 核心登入/登出邏輯 (V9 修復時序)
     // =================================================================
 
-    // 登入按鈕點擊處理
+    // 登入按鈕點擊處理 (使用 addEventListener)
     document.getElementById('signInButton').addEventListener('click', () => {
-        const provider = new GoogleAuthProvider(); // V9
-        signInWithPopup(auth, provider) // V9
+        const provider = new GoogleAuthProvider(); 
+        signInWithPopup(auth, provider) 
             .catch(error => {
+                // 登入彈窗被關閉或權限被拒絕也會在這裡
+                console.error("Google 登入失敗:", error);
                 alert(`登入失敗: ${error.message}`);
             });
     });
 
     // 登出按鈕點擊處理
     document.getElementById('signOutButton').addEventListener('click', () => {
-        signOut(auth); // V9
+        signOut(auth); 
     });
 
     // *** 核心修復：監聽登入狀態，並在登入後才讀取資料 ***
-    onAuthStateChanged(auth, user => { // V9
+    onAuthStateChanged(auth, user => { 
         if (user) {
             // --- 使用者已登入 ---
             currentUserId = user.uid;
@@ -803,10 +795,7 @@
             document.getElementById("authPanel").style.display = "none";
             document.getElementById("content").style.display = "block";
             
-            // 1. 載入歷史記錄 (修正了時序問題)
             loadHistoryChecklists(); 
-            
-            // 2. 檢查並處理管理員狀態 (修正了時序問題)
             checkUserAdminStatus(user.uid);
 
         } else {
@@ -852,7 +841,6 @@
              return;
         }
 
-        // V9: 使用 addDoc
         addDoc(collection(doc(db, "public", "data"), "budget_checklists"), {
             project: project,
             account: account,
@@ -861,7 +849,7 @@
             reviewerEmail: reviewerEmail,
             result: null, 
             notes: null,
-            executionTimestamp: serverTimestamp(), // V9: serverTimestamp()
+            executionTimestamp: serverTimestamp(), 
             createdByUserId: currentUserId,
             creatorEmail: currentUserEmail,
         })
@@ -880,3 +868,4 @@
 </body>
 
 </html>
+
