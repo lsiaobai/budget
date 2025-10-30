@@ -766,59 +766,60 @@
             });
     }
 
-    // =================================================================
-    // 6. 核心登入/登出邏輯 (V9 修復時序)
-    // =================================================================
+// =================================================================
+// 6. 核心登入/登出邏輯 (V9 修復時序)
+// =================================================================
 
-// 登入按鈕點擊處理 (改用 signInWithRedirect 解決彈窗問題)
-document.getElementById('signInButton').addEventListener('click', () => {
-    const provider = new GoogleAuthProvider(); 
-    
-    // *** 核心修改：從 Popup 改為 Redirect ***
-    signInWithRedirect(auth, provider) 
-        // 註：使用 redirect 時，這裡的 .catch 不會被觸發，
-        // 錯誤會在頁面重新導向回來後，由 getRedirectResult 處理。
-        // 但由於我們主要依賴 onAuthStateChanged，這不是必須的。
-        .catch(error => {
-            console.error("嘗試啟動重新導向失敗:", error);
-            alert(`登入啟動失敗: ${error.message}`);
-        });
+// *** 核心修復：監聽登入狀態 (不需等待 DOM 載入，所以放在外面) ***
+onAuthStateChanged(auth, user => { 
+    if (user) {
+        // --- 使用者已登入 ---
+        currentUserId = user.uid;
+        currentUserEmail = user.email;
+        document.getElementById("userStatus").innerText = `已登入: ${currentUserEmail}`;
+        document.getElementById("authPanel").style.display = "none";
+        document.getElementById("content").style.display = "block";
+        
+        loadHistoryChecklists(); 
+        checkUserAdminStatus(user.uid);
+
+    } else {
+        // --- 使用者已登出 ---
+        currentUserId = null;
+        currentUserEmail = null;
+        isAdminUser = false;
+        document.getElementById("userStatus").innerText = "未登入";
+        document.getElementById("authPanel").style.display = "block";
+        document.getElementById("content").style.display = "none";
+        document.getElementById("adminPanel").style.display = "none";
+
+        // 清空並顯示未登入訊息
+        document.getElementById("historyListBody").innerHTML = '';
+        document.getElementById("userListBody").innerHTML = '';
+        document.getElementById("historyMessage").innerText = "❌ 未登入，無法載入歷史記錄。請登入。";
+        document.getElementById("userListMessage").innerText = "❌ 未登入，無法載入用戶列表。請登入。";
+    }
 });
+
+
+// *** 關鍵修復點：確保在附加事件監聽器前，DOM 已經載入完畢 ***
+document.addEventListener('DOMContentLoaded', () => {
+
+    // 登入按鈕點擊處理 (改用 signInWithRedirect 解決彈窗問題)
+    document.getElementById('signInButton').addEventListener('click', () => {
+        const provider = new GoogleAuthProvider(); 
+        
+        // 核心修改：使用 Redirect 模式
+        signInWithRedirect(auth, provider) 
+            .catch(error => {
+                console.error("嘗試啟動重新導向失敗:", error);
+                alert(`登入啟動失敗: ${error.message}`);
+            });
+    });
 
     // 登出按鈕點擊處理
     document.getElementById('signOutButton').addEventListener('click', () => {
         signOut(auth); 
-    });
-
-    // *** 核心修復：監聽登入狀態，並在登入後才讀取資料 ***
-    onAuthStateChanged(auth, user => { 
-        if (user) {
-            // --- 使用者已登入 ---
-            currentUserId = user.uid;
-            currentUserEmail = user.email;
-            document.getElementById("userStatus").innerText = `已登入: ${currentUserEmail}`;
-            document.getElementById("authPanel").style.display = "none";
-            document.getElementById("content").style.display = "block";
-            
-            loadHistoryChecklists(); 
-            checkUserAdminStatus(user.uid);
-
-        } else {
-            // --- 使用者已登出 ---
-            currentUserId = null;
-            currentUserEmail = null;
-            isAdminUser = false;
-            document.getElementById("userStatus").innerText = "未登入";
-            document.getElementById("authPanel").style.display = "block";
-            document.getElementById("content").style.display = "none";
-            document.getElementById("adminPanel").style.display = "none";
-
-            // 清空並顯示未登入訊息
-            document.getElementById("historyListBody").innerHTML = '';
-            document.getElementById("userListBody").innerHTML = '';
-            document.getElementById("historyMessage").innerText = "❌ 未登入，無法載入歷史記錄。請登入。";
-            document.getElementById("userListMessage").innerText = "❌ 未登入，無法載入用戶列表。請登入。";
-        }
     });
 
 
@@ -869,10 +870,13 @@ document.getElementById('signInButton').addEventListener('click', () => {
         });
     });
 
+});
+
 </script>
 </body>
 
 </html>
+
 
 
 
