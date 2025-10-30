@@ -199,11 +199,22 @@
         window.signInWithGoogle = async () => {
             const provider = new GoogleAuthProvider();
             try {
+                // 嘗試開啟彈出視窗登入
                 await signInWithPopup(auth, provider);
                 document.getElementById('auth-error').classList.add('hidden');
             } catch (error) {
                 console.error("Google 登入失敗:", error);
-                document.getElementById('auth-error').textContent = `Google 登入失敗: Firebase: Error (${error.code || error.message}). 請確認 Firebase Authorized domains 設定是否正確。`;
+                
+                // 強化錯誤訊息，提示用戶檢查彈出視窗阻擋器
+                document.getElementById('auth-error').innerHTML = `
+                    <span class="font-bold">❌ Google 登入失敗:</span> Firebase Error (${error.code || error.message}). 
+                    <br>
+                    <span class="text-yellow-100">
+                    若登入按鈕點擊無反應，請檢查瀏覽器是否阻擋了彈出視窗 
+                    <span class="font-extrabold">(Popup Blocker)</span> 
+                    或 Firebase 專案設定中的 Authorized domains。
+                    </span>
+                `;
                 document.getElementById('auth-error').classList.remove('hidden');
             }
         };
@@ -818,7 +829,7 @@
             <h1 class="text-3xl font-bold mb-2 sm:mb-0">廣告預算核對雙簽表</h1>
             <div class="flex items-center space-x-3">
                 <span id="auth-status" class="text-sm italic">請登入</span>
-                <!-- FIXED: 移除 'hidden' 類別，確保登入按鈕預設可見 -->
+                <!-- 登入按鈕修正為顯示狀態 -->
                 <button id="login-button" onclick="signInWithGoogle()" 
                         class="bg-white text-indigo-600 px-4 py-2 rounded-full font-semibold shadow-md hover:bg-gray-100 transition duration-150">
                     登入 Google
@@ -830,6 +841,7 @@
             </div>
         </div>
         <p class="text-indigo-200 mt-1">Campaign Budget Verification Checklist (C-BVC) - 權限管控版</p>
+        <!-- 強化錯誤訊息顯示區塊 -->
         <p id="auth-error" class="text-yellow-300 bg-red-800 p-2 rounded-lg mt-3 hidden text-sm font-medium"></p>
     </header>
 
@@ -901,7 +913,7 @@
                                 <option value="Google Ads">Google Ads</option>
                                 <option value="Meta Ads">Meta Ads</option>
                                 <option value="Line Ads">Line Ads</option>
-                                <option option="Other">其他</option>
+                                <option value="Other">其他</option>
                             </select></label>
                             <label class="block text-sm font-medium text-gray-700">檢核項目: <select name="verificationType" data-group="executor" required class="w-full p-2 border border-indigo-200 rounded-md">
                                 <option value="">選擇項目</option>
