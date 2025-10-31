@@ -1048,11 +1048,12 @@ window.populateFilterOptions = function() {
             document.getElementById('calculatedResult').classList.remove('text-red-600', 'text-green-700');
         }
 		
-// 【新增：顯示細節彈出視窗的函數】
-function showDetailModal(id) {
+// 【替換：確保 showDetailModal 函數被註冊到 window】
+window.showDetailModal = function(id) {
     const item = checklistData.find(d => d.id === id);
     if (!item) {
-        showStatus(`找不到 ID 為 ${id} 的記錄細節。`, 'error');
+        // 如果找不到資料，拋出狀態訊息
+        showStatus(`❌ 找不到 ID 為 ${id} 的記錄細節。`, 'error');
         return;
     }
 
@@ -1110,8 +1111,8 @@ function showDetailModal(id) {
     document.getElementById('detailModal').classList.remove('hidden');
 }
 
-// 【新增：關閉彈出視窗的函數】
-function closeDetailModal() {
+// 【替換：確保 closeDetailModal 函數被註冊到 window】
+window.closeDetailModal = function() {
     document.getElementById('detailModal').classList.add('hidden');
 }
         // 【完整替換：包含篩選邏輯和表格渲染】
@@ -1461,6 +1462,7 @@ function displayChecklistHistory() {
     </script>
 </body>
 </html>
+
 
 
 
