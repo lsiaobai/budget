@@ -870,57 +870,50 @@ window.populateFilterOptions = function() {
             showStatus("已清空表單，您可以新增一筆新資料。", 'info');
         }
 
-        // Function to collect form data
-        function collectFormData() {
-            const form = document.getElementById('checklistForm');
-            
-            if (!form.checkValidity()) {
-                showStatus("錯誤：請檢查並填寫所有標註星號的必填欄位。", 'error');
-                return null;
-            }
-            
-            let dataToSave = {};
+// Function to collect form data
+function collectFormData() {
+    const form = document.getElementById('checklistForm');
 
-            if (editMode === 'new') {
-                // 新增模式：只收集 Executor 欄位 + 創建資訊
-                dataToSave = {
-                    ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
-                    createdByUserId: userId,
-                    creatorEmail: userEmail,
-                    executionTimestamp: serverTimestamp(), // 建立時即為執行時間
-                    reviewTimestamp: null, // 檢核時間為空
-                };
-            } else if (editMode === 'edit_executor') {
-                // 修改執行模式：只允許修改 Executor 欄位 + 更新時間
-                dataToSave = {
-                    ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
-                    // notes 已包含在 executorFields 內
-                    executionTimestamp: serverTimestamp(), // 更新執行時間
-                };
-} else if (editMode === 'edit_reviewer') {
-        // 🚨 檢核者模式：只構造規則中允許的欄位
-        updateData = {
-            // 核心簽核欄位 (必須提交)
-            reviewer: currentUser.displayName,
-            reviewerId: userId,
-            result: formData.result,
-            reviewTimestamp: serverTimestamp(), 
-            notes: formData.notes, // 💡 新增：將執行人的總備註(notes)納入，允許檢核人更新
-        };
+    if (!form.checkValidity()) {
+        showStatus("錯誤：請檢查並填寫所有標註星號的必填欄位。", 'error');
+        return null;
+    }
 
-	    	// 修正後的程式碼：已移除對「不通過」的儲存限制
-		        /*
-                // 檢核結果為「不通過」時阻止儲存 (前端提示)
-                if (dataToSave.result === 'fail') {
-                    showStatus("錯誤：核對結果為「不通過」，請先修正並將結果改為「通過」或在備註說明後再儲存。", 'error');
-                    return null;
-                }
-		*/
-            }
-            
-            return dataToSave;
-        }
+    let dataToSave = {};
 
+    if (editMode === 'new' || editMode === 'edit_executor') { // 💡 將新增和執行人修改邏輯合併
+        // 執行人/新增模式：收集 Executor 欄位 + 創建/更新資訊
+        dataToSave = {
+            // 使用 reduce 確保只收集 executorFields 內的欄位
+            ...executorFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
+            // 系統資訊（這些在 saveChecklist 中會被覆蓋/檢查）
+            // 注意：這裡只收集，不設定 serverTimestamp，讓 saveChecklist 負責最終設定
+            createdByUserId: userId,
+            creatorEmail: userEmail,
+            executionTimestamp: null, // 讓 saveChecklist 處理時間戳記
+        };
+    } else if (editMode === 'edit_reviewer') {
+        // 檢核者模式：只收集檢核相關的欄位（表單元素）
+        dataToSave = {
+            // 收集檢核人備註和結果
+            reviewNotes: form.elements.reviewNotes.value || '',
+            result: form.elements.result.value || 'pass',
+            // 收集 actual... 欄位（如果在檢核模式下允許修改）
+            actualOriginalAccountBudget: form.elements.actualOriginalAccountBudget.value || '',
+            actualAccountBudgetAfterTopUp: form.elements.actualAccountBudgetAfterTopUp.value || '',
+            actualSet: form.elements.actualSet.value || '',
+            actualStartDate: form.elements.actualStartDate.value || '',
+            actualEndDate: form.elements.actualEndDate.value || '',
+            // 還有執行人的總備註，允許檢核人更新
+            notes: form.elements.notes.value || '',
+        };
+
+        // ... 之前的「不通過」阻止儲存的註釋在這裡不需要了
+
+    } // 👈 這裡只需要一個結束大括號！
+
+    return dataToSave;
+}
 // Save (Add or Update) to Firestore
 async function saveChecklist(event) {
     event.preventDefault(); 
@@ -996,7 +989,7 @@ async function saveChecklist(event) {
     // 🚨 終極清理：移除所有非資料欄位 (不論模式為何)
     delete updateData.editingId; 
     delete updateData.id;
-    delete updateData.createdByUserId;
+   // delete updateData.createdByUserId;
     delete updateData.executorTimeDisplay; 
     delete updateData.reviewTimestampDisplay;
 
@@ -1689,6 +1682,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
