@@ -1213,60 +1213,78 @@ function displayChecklistHistory() {
             <tbody id="checklist-table-body">
     `;
 
-    // 3. 迴圈渲染篩選後的數據
-    filteredData.forEach(item => {
-        
-        const isCreator = item.createdByUserId === userId;
-        const isAdminOrCreator = isAdmin || isCreator;
-        const statusClass = item.result === 'pass' ? 'bg-green-100 text-green-700' : 
-                            item.result === 'fail' ? 'bg-red-100 text-red-700' : 
-                            'bg-blue-100 text-blue-700';
-        const resultText = item.result === 'pass' ? '✅ 通過' : 
-                           item.result === 'fail' ? '❌ 不通過' : 
-                           '📝 待執行';
+// 【index.txt (JavaScript部分) - 找到 displayChecklistHistory 函數並替換此區塊】
 
-        let actionButton;
-        if (item.result === '待執行' || !item.result) { // 處理 result 為空或 '待執行' 的情況
-            if (isCreator) {
-                // 執行者：可以編輯或刪除自己的待執行記錄
-                actionButton = `
-                    <button onclick="startEditOrReview('${item.id}', 'edit_executor')" class="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150 mr-2">編輯</button>
-                    <button onclick="deleteChecklist('${item.id}')" class="bg-red-500 hover:bg-red-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">刪除</button>
-                `;
-            } else if (isAdmin || item.reviewer === 'N/A' || item.reviewerId === userId) {
-                // 管理者或未被指定核對人或已被指定為核對人：可以進行核對
-                actionButton = `<button onclick="startEditOrReview('${item.id}', 'edit_reviewer')" class="bg-green-500 hover:bg-green-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">進行核對</button>`;
-            } else {
-                actionButton = '<span class="text-gray-500 text-xs">等待處理...</span>';
-            }
-        } else {
-            // 已完成簽核的記錄 (pass/fail)，只有管理員可以刪除
-            actionButton = isAdmin ? 
-                `<button onclick="deleteChecklist('${item.id}')" class="bg-red-500 hover:bg-red-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">刪除 (Admin)</button>` :
-                '<span class="text-gray-500 text-xs">已完成</span>';
-        }
+// 3. 迴圈渲染篩選後的數據
+filteredData.forEach(item => {
+    const isCreator = item.createdByUserId === userId;
+    // 確保 isAdmin 變數已經在全域或適當範圍定義
+    // const isAdminOrCreator = isAdmin || isCreator; // 此行不再需要
 
-        tableHtml += `
-            <tr id="row-${item.id}">
-                <td class="text-gray-500 text-xs">${item.id.substring(0, 4)}...</td>
-                <td class="text-sm">${item.date}</td>
-                <td class="font-medium text-gray-700">${item.clientName}</td>
-                <td>${item.executor} (${item.creatorEmail || 'N/A'})</td>
-                <td>${item.reviewer || 'N/A'}</td>
-                <td><span class="inline-block px-3 py-1 text-xs font-semibold rounded-full ${statusClass}">${resultText}</span></td>
-                <td>${actionButton}</td>
-                <td><button onclick="showDetailModal('${item.id}')" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">查看</button></td>
-            </tr>
-        `;
-    });
-
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
+    const statusClass = item.result === 'pass' ? 'bg-green-100 text-green-700' : 
+                        item.result === 'fail' ? 'bg-red-100 text-red-700' : 
+                        'bg-blue-100 text-blue-700';
+    const resultText = item.result === 'pass' ? '✅ 通過' : 
+                       item.result === 'fail' ? '❌ 不通過' : 
+                       '📝 待執行';
     
-    tableContainer.innerHTML = tableHtml;
-}
+    let actionButton;
+
+    // --- 動作按鈕邏輯 ---
+
+    // 管理員專屬的刪除按鈕
+    const deleteBtn = isAdmin ? `
+        <button onclick="deleteChecklist('${item.id}')" 
+            class="bg-red-500 hover:bg-red-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150 ml-2">刪除</button>
+    ` : '';
+    
+    if (item.result === '待執行' || !item.result) { 
+        // 處理 result 為空或 '待執行' 的情況 
+        if (isCreator) { 
+            // 執行者：可以編輯自己的待執行記錄
+            actionButton = `
+                <button onclick="startEditOrReview('${item.id}', 'edit_executor')" 
+                    class="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150 mr-2">編輯</button>
+                ${deleteBtn}
+            `;
+        } 
+        // 檢核者：非建立者 (item.createdByUserId !== userId) 才能檢核
+        else if ((userRole === 'reviewer' && item.createdByUserId !== userId) || isAdmin) { 
+            actionButton = `
+                <button onclick="startEditOrReview('${item.id}', 'edit_reviewer')" 
+                    class="bg-green-600 hover:bg-green-700 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">
+                    ✏️ 進行檢核
+                </button>
+                ${deleteBtn}
+            `;
+        } else { 
+            actionButton = `<span class="text-xs text-gray-500">待簽核</span> ${deleteBtn}`; 
+        } 
+    } else { 
+        // 處理已完成 (pass/fail) 的記錄
+        // 允許非建立者且是檢核者角色的人，重新編輯已完成的檢核結果 (方便修正錯誤)
+        if ((userRole === 'reviewer' && item.createdByUserId !== userId) || isAdmin) {
+             actionButton = `
+                <button onclick="startEditOrReview('${item.id}', 'edit_reviewer')" 
+                    class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">
+                    🔄 修正檢核
+                </button>
+                ${deleteBtn}
+            `;
+        } else {
+             actionButton = `<span class="text-xs text-gray-500">已簽核</span> ${deleteBtn}`; 
+        }
+    }
+    
+    // ... (表格行 HTML 程式碼：將 actionButton 放入表格單元格)
+    tableHtml += `
+        <tr id="row-${item.id}">
+            <td class="text-gray-500 text-xs">${item.id.substring(0, 4)}...</td>
+            <td>${actionButton}</td>
+            <td><button onclick="showDetailModal('${item.id}')" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">查看</button></td>
+        </tr>
+    `;
+});
         
         // --- 管理員後台功能 ---
 
@@ -1511,6 +1529,7 @@ function displayChecklistHistory() {
     </script>
 </body>
 </html>
+
 
 
 
