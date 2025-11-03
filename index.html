@@ -928,58 +928,55 @@ async function saveChecklist(event) {
     if (!formData) return;
     
     let updateData = {}; // 宣告乾淨的提交物件
-    
-// 2. 根據模式篩選並構造提交物件 (最終隔離邏輯)
-if (editMode === 'edit_reviewer') {
-    // 🚨 檢核者模式：只構造規則中允許的欄位
-    updateData = {
-        // 核心簽核欄位 (必須提交)
-        reviewer: currentUser.displayName,
-        reviewerId: userId,
-        result: formData.result, // 使用 formData
-        reviewTimestamp: serverTimestamp(), 
-    };
 
-    // 只有在欄位有值時，才將其加入 updateData
-    // 修正：將 rawFormData 統一替換為 formData
-    if (formData.reviewNotes !== undefined && formData.reviewNotes !== null) { 
-        // 移除前後空白，如果內容非空，則賦值
-        const trimmedNotes = String(formData.reviewNotes).trim();
-        if (trimmedNotes.length > 0) {
-            updateData.reviewNotes = trimmedNotes;
+    // 2. 根據模式篩選並構造提交物件 (最終隔離邏輯)
+    if (editMode === 'edit_reviewer') {
+        // 🚨 檢核者模式：只構造規則中允許的欄位
+        updateData = {
+            // 核心簽核欄位 (必須提交)
+            reviewer: currentUser.displayName,
+            reviewerId: userId,
+            result: formData.result,
+            reviewTimestamp: serverTimestamp(), 
+        };
+
+        // 只有在欄位有值時，才將其加入 updateData
+        if (formData.reviewNotes !== undefined && formData.reviewNotes !== null) { 
+            // 移除前後空白，如果內容非空，則賦值
+            const trimmedNotes = String(formData.reviewNotes).trim();
+            if (trimmedNotes.length > 0) {
+                updateData.reviewNotes = trimmedNotes;
+            }
         }
-    }
-    
-    // 這裡已經是正確的 formData
-    if (formData.actualOriginalAccountBudget) { updateData.actualOriginalAccountBudget = Number(formData.actualOriginalAccountBudget); }
-    if (formData.actualAccountBudgetAfterTopUp) { updateData.actualAccountBudgetAfterTopUp = Number(formData.actualAccountBudgetAfterTopUp); }
-    if (formData.actualSet) { updateData.actualSet = Number(formData.actualSet); }
-    if (formData.actualStartDate) { updateData.actualStartDate = formData.actualStartDate; }
-    if (formData.actualEndDate) { updateData.actualEndDate = formData.actualEndDate; }
+        
+        // 處理 actual... 欄位 (強制轉換為數字)
+        if (formData.actualOriginalAccountBudget) { updateData.actualOriginalAccountBudget = Number(formData.actualOriginalAccountBudget); }
+        if (formData.actualAccountBudgetAfterTopUp) { updateData.actualAccountBudgetAfterTopUp = Number(formData.actualAccountBudgetAfterTopUp); }
+        if (formData.actualSet) { updateData.actualSet = Number(formData.actualSet); }
+        if (formData.actualStartDate) { updateData.actualStartDate = formData.actualStartDate; }
+        if (formData.actualEndDate) { updateData.actualEndDate = formData.actualEndDate; }
 
-    // ... (後續的清理空字串邏輯)
-    // 這裡的 Object.keys(updateData).forEach 邏輯可以保留，但由於上面已經檢查了 trimmedNotes.length > 0，所以它不會刪除 reviewNotes。
-    
-    Object.keys(updateData).forEach(key => {
-        if (updateData[key] === '') { 
-            delete updateData[key];
-        }
-    });
-}
-
-    } else if (editMode === 'edit_executor') {
-        // 執行者模式：您必須在這裡新增一個執行者欄位的 hasOnly 篩選邏輯
-        // 為了不影響檢核功能，這裡暫時使用所有資料
+        // 移除空字串 (以防日期等欄位有空字串被提交)
+        Object.keys(updateData).forEach(key => {
+            if (updateData[key] === '') { 
+                delete updateData[key];
+            }
+        });
+        
+    } else if (editMode === 'edit_executor') { // 🚨 結構已修正
+        // 執行者模式：這裡暫時使用所有資料
         updateData = formData; 
     } else {
         // 新增模式
         updateData = formData;
-    }
+    } // 🚨 結構已修正
     
-    // 🚨 這裡必須放置您的 delete updateData[key] 邏輯，以防 'editingId' 被加入
-    // 由於我們在上面已手動構造 updateData，理論上已隔離，但為保險起見，再次清理
+    // 🚨 終極清理：移除所有非資料欄位 (不論模式為何)
     delete updateData.editingId; 
     delete updateData.id;
+    delete updateData.createdByUserId;
+    delete updateData.executorTimeDisplay; 
+    delete updateData.reviewTimestampDisplay;
 
     const path = CHECKLIST_COLLECTION_PATH;
     
@@ -1589,6 +1586,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
