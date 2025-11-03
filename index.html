@@ -942,7 +942,9 @@ async function saveChecklist(event) {
 
         // 只有在欄位有值時，才將其加入 updateData
         // 注意：我們在這裡不檢查 formData.notes，只檢查 reviewNotes
-        if (formData.reviewNotes) { updateData.reviewNotes = formData.reviewNotes; }
+        if (rawFormData.reviewNotes && rawFormData.reviewNotes.trim() !== '') {
+    updateData.reviewNotes = rawFormData.reviewNotes.trim();
+}
         if (formData.actualOriginalAccountBudget) { updateData.actualOriginalAccountBudget = Number(formData.actualOriginalAccountBudget); }
         if (formData.actualAccountBudgetAfterTopUp) { updateData.actualAccountBudgetAfterTopUp = Number(formData.actualAccountBudgetAfterTopUp); }
         if (formData.actualSet) { updateData.actualSet = Number(formData.actualSet); }
@@ -1581,6 +1583,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
