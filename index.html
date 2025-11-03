@@ -962,8 +962,9 @@ window.populateFilterOptions = function() {
                     return {
                         id: doc.id,
                         ...data,
-                        executionTimestampDisplay: formatTimestamp(data.executionTimestamp),
-                        reviewTimestampDisplay: formatTimestamp(data.reviewTimestamp),
+			createdByUserId: data.createdByUserId, 
+            executionTimestampDisplay: formatTimestamp(data.executionTimestamp),
+            reviewTimestampDisplay: formatTimestamp(data.reviewTimestamp),
                     };
                 }).sort((a, b) => {
                     // 優先按執行時間倒序排列
@@ -1202,10 +1203,10 @@ const filteredData = checklistData.filter(item => {
 
 // 3. 迴圈渲染篩選後的數據
 filteredData.forEach(item => {
+// 判斷是否為記錄的建立者
     const isCreator = item.createdByUserId === userId;
-    // 確保 isAdmin 變數已經在全域或適當範圍定義
-    // const isAdminOrCreator = isAdmin || isCreator; // 此行不再需要
-
+    
+    // 定義狀態 class 和文字
     const statusClass = item.result === 'pass' ? 'bg-green-100 text-green-700' : 
                         item.result === 'fail' ? 'bg-red-100 text-red-700' : 
                         'bg-blue-100 text-blue-700';
@@ -1213,28 +1214,26 @@ filteredData.forEach(item => {
                        item.result === 'fail' ? '❌ 不通過' : 
                        '📝 待執行';
     
-    let actionButton;
-
+    let actionButton = ''; // 初始化為空
+    
     // --- 動作按鈕邏輯 ---
-
-    // 管理員專屬的刪除按鈕
+    // 管理者專屬的刪除按鈕
     const deleteBtn = isAdmin ? `
         <button onclick="deleteChecklist('${item.id}')" 
             class="bg-red-500 hover:bg-red-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150 ml-2">刪除</button>
     ` : '';
-    
+
     if (item.result === '待執行' || !item.result) { 
-        // 處理 result 為空或 '待執行' 的情況 
+        // 狀態為 '待執行' 或尚未有結果
         if (isCreator) { 
-            // 執行者：可以編輯自己的待執行記錄
+            // 規則 1: 執行人 (Creator) 編輯自己的待執行記錄
             actionButton = `
                 <button onclick="startEditOrReview('${item.id}', 'edit_executor')" 
                     class="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150 mr-2">編輯</button>
                 ${deleteBtn}
             `;
-        } 
-        // 檢核者：非建立者 (item.createdByUserId !== userId) 才能檢核
-        else if ((userRole === 'reviewer' && item.createdByUserId !== userId) || isAdmin) { 
+        } else if (!isCreator) { 
+            // 規則 2: 非執行人 (Non-Creator) 可以進行檢核
             actionButton = `
                 <button onclick="startEditOrReview('${item.id}', 'edit_reviewer')" 
                     class="bg-green-600 hover:bg-green-700 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">
@@ -1243,12 +1242,13 @@ filteredData.forEach(item => {
                 ${deleteBtn}
             `;
         } else { 
+            // Fallback (應該不會觸發)
             actionButton = `<span class="text-xs text-gray-500">待簽核</span> ${deleteBtn}`; 
         } 
     } else { 
-        // 處理已完成 (pass/fail) 的記錄
-        // 允許非建立者且是檢核者角色的人，重新編輯已完成的檢核結果 (方便修正錯誤)
-        if ((userRole === 'reviewer' && item.createdByUserId !== userId) || isAdmin) {
+        // 狀態為 'pass' 或 'fail' (已完成)
+        if (!isCreator) {
+            // 規則 2: 非執行人 (Non-Creator) 可以修正已完成的檢核結果
              actionButton = `
                 <button onclick="startEditOrReview('${item.id}', 'edit_reviewer')" 
                     class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-medium py-1 px-3 rounded-full transition duration-150">
@@ -1257,12 +1257,14 @@ filteredData.forEach(item => {
                 ${deleteBtn}
             `;
         } else {
+            // 規則 1: 執行人 (Creator) 只能看已簽核
              actionButton = `<span class="text-xs text-gray-500">已簽核</span> ${deleteBtn}`; 
         }
     }
-	// 🚨 修正：確保 actionButton 絕不為空字串，以防前面邏輯因 userRole 未載入而出錯
-    if (!actionButton || actionButton.trim() === '') {
-        actionButton = `<span class="text-xs text-gray-500">無可用動作</span> ${deleteBtn}`;
+
+    // 🚨 這是避免表格因 actionButton 程式碼錯誤而空白的最後防線，請保留
+    if (actionButton.trim() === '') {
+        actionButton = `<span class="text-xs text-gray-500">無可用動作</span> ${deleteBtn || ''}`;
     }
 
 // ... 接下來是 tableHtml += `...` 的表格行組裝
@@ -1535,6 +1537,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
