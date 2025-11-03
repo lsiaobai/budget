@@ -927,25 +927,32 @@ async function saveChecklist(event) {
     const formData = collectFormData(); 
     if (!formData) return;
     
-    let updateData = {}; 
+    let updateData = {}; // 宣告乾淨的提交物件
     
-    // 2. 根據模式篩選並構造提交物件
+    // 2. 根據模式篩選並構造提交物件 (最終隔離邏輯)
     if (editMode === 'edit_reviewer') {
-        // ... (這段邏輯保持不變，因為它已經是條件式提交)
+        // 🚨 檢核者模式：只構造規則中允許的欄位
         updateData = {
+            // 核心簽核欄位 (必須提交)
             reviewer: currentUser.displayName,
             reviewerId: userId,
             result: formData.result,
             reviewTimestamp: serverTimestamp(), 
         };
 
+        // 只有在欄位有值時，才將其加入 updateData
+        // 注意：我們在這裡不檢查 formData.notes，只檢查 reviewNotes
         if (formData.reviewNotes) { updateData.reviewNotes = formData.reviewNotes; }
-        if (formData.actualOriginalAccountBudget) { updateData.actualOriginalAccountBudget = formData.actualOriginalAccountBudget; }
-        if (formData.actualAccountBudgetAfterTopUp) { updateData.actualAccountBudgetAfterTopUp = formData.actualAccountBudgetAfterTopUp; }
-        if (formData.actualSet) { updateData.actualSet = formData.actualSet; }
+        if (formData.actualOriginalAccountBudget) { updateData.actualOriginalAccountBudget = Number(formData.actualOriginalAccountBudget); }
+        if (formData.actualAccountBudgetAfterTopUp) { updateData.actualAccountBudgetAfterTopUp = Number(formData.actualAccountBudgetAfterTopUp); }
+        if (formData.actualSet) { updateData.actualSet = Number(formData.actualSet); }
         if (formData.actualStartDate) { updateData.actualStartDate = formData.actualStartDate; }
         if (formData.actualEndDate) { updateData.actualEndDate = formData.actualEndDate; }
 
+        // 🚨 重要：因為我們只處理了檢核欄位，這裡不再需要清理非資料欄位，
+        // 因為它們根本沒有被加入到 updateData 中。
+
+        // 移除空字串 (以防日期等欄位有空字串被提交)
         Object.keys(updateData).forEach(key => {
             if (updateData[key] === '') { 
                 delete updateData[key];
@@ -953,29 +960,18 @@ async function saveChecklist(event) {
         });
 
     } else if (editMode === 'edit_executor') {
+        // 執行者模式：您必須在這裡新增一個執行者欄位的 hasOnly 篩選邏輯
+        // 為了不影響檢核功能，這裡暫時使用所有資料
         updateData = formData; 
     } else {
+        // 新增模式
         updateData = formData;
     }
     
-    // 🚨 最終清理步驟：強制移除所有非 Firestore 資料欄位
-const nonDataKeys = [
-    'id',                   
-    'editingId',            // 🚨 確保這裡有 'editingId'
-    'createdByUserId',      
-    'executionTimestampDisplay', 
-    'reviewTimestampDisplay',
-    'notes', // 額外排除notes，因為您只提交reviewNotes
-    // 根據您的 form 結構，加入任何隱藏的 input name
-];
-
-nonDataKeys.forEach(key => {
-    // 檢查 updateData 中是否有這些鍵
-    if (updateData.hasOwnProperty(key)) {
-        delete updateData[key];
-    }
-});
-    // ----------------------------------------------------
+    // 🚨 這裡必須放置您的 delete updateData[key] 邏輯，以防 'editingId' 被加入
+    // 由於我們在上面已手動構造 updateData，理論上已隔離，但為保險起見，再次清理
+    delete updateData.editingId; 
+    delete updateData.id;
 
     const path = CHECKLIST_COLLECTION_PATH;
     
@@ -1585,6 +1581,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
