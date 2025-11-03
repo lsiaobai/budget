@@ -930,50 +930,45 @@ async function saveChecklist(event) {
     let updateData = {}; // 宣告乾淨的提交物件
     
     // 2. 根據模式篩選並構造提交物件 (核心修正點)
-if (editMode === 'edit_reviewer') {
-    updateData = {
-        // 核心簽核欄位 (必須提交)
-        reviewer: currentUser.displayName,
-        reviewerId: userId,
-        result: formData.result,
-        reviewTimestamp: serverTimestamp(), 
-    };
+    if (editMode === 'edit_reviewer') {
+        // 🚨 檢核者模式：只提交規則中允許的欄位
+        updateData = {
+            // 核心簽核欄位 (必須提交)
+            reviewer: currentUser.displayName,
+            reviewerId: userId,
+            result: formData.result,
+            reviewTimestamp: serverTimestamp(), 
+        };
 
-    // 只有在欄位有值時，才將其加入 updateData
-    // 檢核人填寫的備註
-    if (formData.reviewNotes) { 
-        updateData.reviewNotes = formData.reviewNotes;
-    }
-    
-    // 檢核人填寫的實際值
-    if (formData.actualOriginalAccountBudget) {
-        updateData.actualOriginalAccountBudget = formData.actualOriginalAccountBudget;
-    }
-    if (formData.actualAccountBudgetAfterTopUp) {
-        updateData.actualAccountBudgetAfterTopUp = formData.actualAccountBudgetAfterTopUp;
-    }
-    // 雖然您沒填，但如果表單中存在，仍需檢查
-    if (formData.actualSet) {
-        updateData.actualSet = formData.actualSet;
-    }
-    if (formData.actualStartDate) {
-        updateData.actualStartDate = formData.actualStartDate;
-    }
-    if (formData.actualEndDate) {
-        updateData.actualEndDate = formData.actualEndDate;
-    }
-    
-    // 移除空值 (這段邏輯必須確保不會移除 0 或 false 等有效值)
-    // 我們使用更安全的刪除邏輯：只移除空字串。
-    Object.keys(updateData).forEach(key => {
-        if (updateData[key] === '') { 
-            delete updateData[key];
+        // 只有在欄位有值時，才將其加入 updateData (允許檢核者不填寫 actual... 欄位)
+        if (formData.reviewNotes) { 
+            updateData.reviewNotes = formData.reviewNotes;
         }
-    });
-}
+        if (formData.actualOriginalAccountBudget) {
+            updateData.actualOriginalAccountBudget = formData.actualOriginalAccountBudget;
+        }
+        if (formData.actualAccountBudgetAfterTopUp) {
+            updateData.actualAccountBudgetAfterTopUp = formData.actualAccountBudgetAfterTopUp;
+        }
+        if (formData.actualSet) {
+            updateData.actualSet = formData.actualSet;
+        }
+        if (formData.actualStartDate) {
+            updateData.actualStartDate = formData.actualStartDate;
+        }
+        if (formData.actualEndDate) {
+            updateData.actualEndDate = formData.actualEndDate;
+        }
+
+        // 清理空字串
+        Object.keys(updateData).forEach(key => {
+            if (updateData[key] === '') { 
+                delete updateData[key];
+            }
+        });
 
     } else if (editMode === 'edit_executor') {
-        // 執行者模式 (這裡需要根據執行者的規則來構造，但目前保持原樣，避免影響檢核修正)
+        // 執行者模式 (這裡需要根據執行者的規則來構造，這裡暫時使用所有資料)
         updateData = formData; 
     } else {
         // 新增模式
@@ -981,16 +976,15 @@ if (editMode === 'edit_reviewer') {
     }
 
     const path = CHECKLIST_COLLECTION_PATH;
-    const docRef = doc(db, path, editingId); 
     
     try {
         if (editingId) {
-            // 使用篩選後的 updateData
-            await setDoc(docRef, updateData, { merge: true }); 
+            // 更新：使用篩選後的 updateData
+            await setDoc(doc(db, path, editingId), updateData, { merge: true }); 
             showStatus(`✅ 核對結果已成功更新 (${editMode})。`, 'success');
         } else {
-            // Add new document
-            await addDoc(docRef, updateData); 
+            // 新增：由於新增模式 updateData == formData，使用 addDoc
+            await addDoc(collection(db, path), updateData); 
             showStatus("✅ 執行設定已成功儲存並建立新紀錄。", 'success');
         }
         resetForm(); 
@@ -1589,6 +1583,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
