@@ -959,20 +959,22 @@ async function saveChecklist(event) {
     }
     
     // 🚨 最終清理步驟：強制移除所有非 Firestore 資料欄位
-    const nonDataKeys = [
-        'id',                   // 文件 ID (如果被收集)
-        'editingId',            // 🚨 這是致命元兇
-        'createdByUserId',      // 建立者 ID
-        'executionTimestampDisplay', 
-        'reviewTimestampDisplay',
-        // 任何其他在表單中，但不需要儲存的欄位
-    ];
+const nonDataKeys = [
+    'id',                   
+    'editingId',            // 🚨 確保這裡有 'editingId'
+    'createdByUserId',      
+    'executionTimestampDisplay', 
+    'reviewTimestampDisplay',
+    'notes', // 額外排除notes，因為您只提交reviewNotes
+    // 根據您的 form 結構，加入任何隱藏的 input name
+];
 
-    nonDataKeys.forEach(key => {
-        if (updateData.hasOwnProperty(key)) {
-            delete updateData[key];
-        }
-    });
+nonDataKeys.forEach(key => {
+    // 檢查 updateData 中是否有這些鍵
+    if (updateData.hasOwnProperty(key)) {
+        delete updateData[key];
+    }
+});
     // ----------------------------------------------------
 
     const path = CHECKLIST_COLLECTION_PATH;
@@ -1583,6 +1585,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
