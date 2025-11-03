@@ -301,10 +301,15 @@
                 </div>
                 
                 <!-- 備註 -->
-               <div class="mt-6">
-    				<label for="reviewNotes" class="font-bold text-gray-800 mb-2 block">備註/修正說明</label>
-   					 <textarea id="reviewNotes" name="reviewNotes" rows="3" placeholder="請填寫檢核意見或修正備註。" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-				</div>
+<div class="mt-6">
+    <label for="executorNotes" class="font-bold text-gray-800 mb-2 block">總備註 (執行人)</label>
+    <textarea id="executorNotes" name="notes" rows="3" placeholder="請填寫任何特殊情況或修正過程。"></textarea> 
+    </div>
+
+<div class="mt-6">
+    <label for="reviewNotes" class="font-bold text-gray-800 mb-2 block">檢核意見/修正備註</label>
+    <textarea id="reviewNotes" name="reviewNotes" rows="3" placeholder="請填寫檢核意見或修正備註。"></textarea>
+</div>
 
                 <!-- 動作按鈕 -->
                 <div class="mt-8 flex flex-col sm:flex-row gap-4">
@@ -892,17 +897,16 @@ window.populateFilterOptions = function() {
                     // notes 已包含在 executorFields 內
                     executionTimestamp: serverTimestamp(), // 更新執行時間
                 };
-            } else if (editMode === 'edit_reviewer') {
-                 // 修改檢核模式：只允許修改 Reviewer 欄位 + 更新時間
-                dataToSave = {
-                    // 必須包含所有 Reviewer 欄位
-                    ...reviewerFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
-               //     notes: form.elements['notes'].value, // 備註可修改
-                    reviewer: form.elements['reviewer'].value, // 檢核人必填
-                    result: form.elements['result'].value, // 結果必填
-                    reviewTimestamp: serverTimestamp(), // 更新檢核時間
-                };
-
+} else if (editMode === 'edit_reviewer') {
+        // 🚨 檢核者模式：只構造規則中允許的欄位
+        updateData = {
+            // 核心簽核欄位 (必須提交)
+            reviewer: currentUser.displayName,
+            reviewerId: userId,
+            result: formData.result,
+            reviewTimestamp: serverTimestamp(), 
+            notes: formData.notes, // 💡 新增：將執行人的總備註(notes)納入，允許檢核人更新
+        };
 
 	    	// 修正後的程式碼：已移除對「不通過」的儲存限制
 		        /*
@@ -1344,6 +1348,87 @@ tableHtml += `
 tableContainer.innerHTML = tableHtml;
 } // <-- 這是 displayChecklistHistory 函數的結束
 
+// 【新增 1: currentFilters 變數】
+// 💡 確保在文件頂部（全域作用域）定義了這個變數
+// 這是儲存篩選狀態的關鍵，如果尚未定義請新增它：
+let currentFilters = {
+    executor: 'all',
+    reviewer: 'all',
+    result: 'all'
+};
+
+// 【新增 2: 處理篩選變化的函數】
+function handleFilterChange(event) {
+    const key = event.target.getAttribute('data-filter-key');
+    const value = event.target.value;
+    currentFilters[key] = value;
+    displayChecklistHistory(); // 重新渲染列表以應用新篩選器
+}
+window.handleFilterChange = handleFilterChange; // 暴露給全局
+
+// 【新增 3: 初始化篩選器監聽器的函數】
+function initFilterListeners() {
+    const executorSelect = document.getElementById('filter-executor');
+    const reviewerSelect = document.getElementById('filter-reviewer');
+    const resultSelect = document.getElementById('filter-result');
+
+    if (executorSelect) {
+        // 確保 data-filter-key 被設定以便 handleFilterChange 識別
+        executorSelect.setAttribute('data-filter-key', 'executor');
+        // 綁定事件
+        executorSelect.addEventListener('change', window.handleFilterChange);
+    }
+    if (reviewerSelect) {
+        reviewerSelect.setAttribute('data-filter-key', 'reviewer');
+        reviewerSelect.addEventListener('change', window.handleFilterChange);
+    }
+    if (resultSelect) {
+        resultSelect.setAttribute('data-filter-key', 'result');
+        resultSelect.addEventListener('change', window.handleFilterChange);
+    }
+}
+window.initFilterListeners = initFilterListeners; // 暴露給全局
+
+// 【新增 4: 填充篩選器選項的函數】
+function populateFilterOptions() {
+    const executorSelect = document.getElementById('filter-executor');
+    const reviewerSelect = document.getElementById('filter-reviewer');
+    
+    // 輔助函數：收集唯一且非空的選項
+    const getUniqueOptions = (key) => {
+        const options = new Set();
+        checklistData.forEach(item => {
+            if (item[key]) {
+                // 執行人使用 creatorEmail，檢核人使用 reviewer 名稱
+                const value = key === 'creatorEmail' ? item.creatorEmail : item.reviewer;
+                options.add(value);
+            }
+        });
+        return Array.from(options).sort();
+    };
+
+    const populateSelect = (selectElement, options, currentFilter) => {
+        if (!selectElement) return;
+        
+        const currentSelectedValue = currentFilter;
+        // 清除舊選項，並新增 'All' 選項
+        selectElement.innerHTML = `<option value="all">所有 (${selectElement.getAttribute('data-label')})</option>`;
+        
+        options.forEach(option => {
+            const isSelected = option === currentSelectedValue ? 'selected' : '';
+            selectElement.innerHTML += `<option value="${option}" ${isSelected}>${option}</option>`;
+        });
+    };
+
+    // 填充執行人篩選器
+    const executorOptions = getUniqueOptions('creatorEmail');
+    // 注意：在 checklistData 中，執行人的 email 儲存在 creatorEmail 欄位
+    populateSelect(executorSelect, executorOptions, currentFilters.executor);
+
+    // 填充檢核人篩選器
+    const reviewerOptions = getUniqueOptions('reviewer');
+    populateSelect(reviewerSelect, reviewerOptions, currentFilters.reviewer);
+}
 // --- 管理員後台功能 --- (註釋和下一個函數之間不應有額外符號或不規則縮排)
 
 async function openAdminPanel() {
@@ -1499,7 +1584,7 @@ async function openAdminPanel() {
             
             // 設定登入/登出監聽器
 			// 【新增：在此處呼叫初始化函數，確保篩選器監聽器在頁面載入時綁定】
-		///	initFilterListeners(); <--- 請新增此行
+			initFilterListeners(); <--- 請新增此行
             onAuthStateChanged(auth, handleAuthStateChange);
             
             // 表單事件
@@ -1588,6 +1673,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
