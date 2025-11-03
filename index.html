@@ -1170,24 +1170,17 @@ function displayChecklistHistory() {
     // 如果表格容器不存在，則結束
     if (!tableContainer) return;
     
-    // 1. 執行篩選
-    let filteredData = checklistData.filter(item => {
-        // 執行者篩選 (使用 creatorEmail)
-        const executorMatch = currentFilters.executor === 'all' || 
-                              item.creatorEmail === currentFilters.executor;
+// 1. 執行篩選
+// 🚨 修正：移除所有隱性篩選，只保留使用者在 UI 上設定的篩選器
+const filteredData = checklistData.filter(item => {
+    // 檢查自定義篩選器
+    const executorMatch = currentFilters.executor === 'all' || item.creatorEmail === currentFilters.executor;
+    const reviewerMatch = currentFilters.reviewer === 'all' || item.reviewer === currentFilters.reviewer;
+    const resultMatch = currentFilters.result === 'all' || item.result === currentFilters.result;
 
-        // 檢核者篩選 (使用 reviewer 姓名)
-        const reviewerMatch = currentFilters.reviewer === 'all' || 
-                              item.reviewer === currentFilters.reviewer;
-
-        // 結果篩選 (使用 HTML option 的 value: pass/fail/待執行)
-        const itemResultValue = item.result || '待執行'; // 確保未填寫時是 '待執行'
-
-        const resultMatch = currentFilters.result === 'all' || 
-                            currentFilters.result === itemResultValue; // 使用 pass/fail/待執行 進行匹配
-
-        return executorMatch && reviewerMatch && resultMatch;
-    });
+    // 只要通過使用者設置的篩選器即可顯示 (對所有角色一視同仁)
+    return executorMatch && reviewerMatch && resultMatch;
+});
     
     // 如果篩選結果為空
     if (filteredData.length === 0) {
@@ -1536,6 +1529,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
