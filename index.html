@@ -969,13 +969,29 @@ async function saveChecklist(event) {
             }
         });
         
-    } else if (editMode === 'edit_executor') { // 🚨 結構已修正
-        // 執行者模式：這裡暫時使用所有資料
-        updateData = formData; 
-    } else {
-        // 新增模式
+   } else if (editMode === 'edit_executor' || !editingId) { // 🚨 結構已修正 (包含新增模式)
+        // 執行者模式 或 新增模式：使用所有表單資料，並自動注入系統資訊
+        updateData = {
+            ...formData,
+            // 系統自動注入欄位
+            executor: currentUser.displayName,
+            creatorEmail: currentUser.email, // 確保有 email
+            createdByUserId: userId, // 確保有 User ID
+            executionTimestamp: serverTimestamp(), // 更新執行時間
+        };
+
+        // 清理 reviewNotes 和 reviewer 欄位，確保執行人模式不會提交舊的簽核資料
+        delete updateData.reviewer;
+        delete updateData.reviewerId;
+        delete updateData.reviewNotes;
+        delete updateData.reviewTimestamp;
+        delete updateData.result; // 重設簽核結果為 '待執行' 或空，讓檢核人重新簽核
+    
+    } else {
+        // Fallback，不應發生
+        console.warn("Unknown edit mode or logic error in saveChecklist.");
         updateData = formData;
-    } // 🚨 結構已修正
+    }
     
     // 🚨 終極清理：移除所有非資料欄位 (不論模式為何)
     delete updateData.editingId; 
@@ -1673,6 +1689,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
