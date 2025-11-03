@@ -930,42 +930,47 @@ async function saveChecklist(event) {
     let updateData = {}; // 宣告乾淨的提交物件
     
     // 2. 根據模式篩選並構造提交物件 (核心修正點)
-    if (editMode === 'edit_reviewer') {
-        // 🚨 檢核者模式：只提交規則中允許的 10 個欄位
-        updateData = {
-    // 核心簽核欄位 (必須提交)
-    reviewer: currentUser.displayName,
-    reviewerId: userId,
-    result: formData.result,
-    reviewTimestamp: serverTimestamp(), 
-    // notes 是選填的，讓它保持在 if 判斷之外，讓 Object.keys 清理
-    notes: formData.notes || '', 
-};
+if (editMode === 'edit_reviewer') {
+    updateData = {
+        // 核心簽核欄位 (必須提交)
+        reviewer: currentUser.displayName,
+        reviewerId: userId,
+        result: formData.result,
+        reviewTimestamp: serverTimestamp(), 
+    };
 
-// 只有在欄位有值時，才將其加入 updateData
-if (formData.actualOriginalAccountBudget) {
-    updateData.actualOriginalAccountBudget = formData.actualOriginalAccountBudget;
+    // 只有在欄位有值時，才將其加入 updateData
+    // 檢核人填寫的備註
+    if (formData.reviewNotes) { 
+        updateData.reviewNotes = formData.reviewNotes;
+    }
+    
+    // 檢核人填寫的實際值
+    if (formData.actualOriginalAccountBudget) {
+        updateData.actualOriginalAccountBudget = formData.actualOriginalAccountBudget;
+    }
+    if (formData.actualAccountBudgetAfterTopUp) {
+        updateData.actualAccountBudgetAfterTopUp = formData.actualAccountBudgetAfterTopUp;
+    }
+    // 雖然您沒填，但如果表單中存在，仍需檢查
+    if (formData.actualSet) {
+        updateData.actualSet = formData.actualSet;
+    }
+    if (formData.actualStartDate) {
+        updateData.actualStartDate = formData.actualStartDate;
+    }
+    if (formData.actualEndDate) {
+        updateData.actualEndDate = formData.actualEndDate;
+    }
+    
+    // 移除空值 (這段邏輯必須確保不會移除 0 或 false 等有效值)
+    // 我們使用更安全的刪除邏輯：只移除空字串。
+    Object.keys(updateData).forEach(key => {
+        if (updateData[key] === '') { 
+            delete updateData[key];
+        }
+    });
 }
-if (formData.actualAccountBudgetAfterTopUp) {
-    updateData.actualAccountBudgetAfterTopUp = formData.actualAccountBudgetAfterTopUp;
-}
-if (formData.actualSet) {
-    updateData.actualSet = formData.actualSet;
-}
-if (formData.actualStartDate) {
-    updateData.actualStartDate = formData.actualStartDate;
-}
-if (formData.actualEndDate) {
-    updateData.actualEndDate = formData.actualEndDate;
-}
-
-        // 清理空字串/零值，避免不必要的資料儲存
-        Object.keys(updateData).forEach(key => {
-             // 確保零值 (0) 不被刪除，但空字串可以刪除
-            if (updateData[key] === '') { 
-                delete updateData[key];
-            }
-        });
 
     } else if (editMode === 'edit_executor') {
         // 執行者模式 (這裡需要根據執行者的規則來構造，但目前保持原樣，避免影響檢核修正)
@@ -1584,6 +1589,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
