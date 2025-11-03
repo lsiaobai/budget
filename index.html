@@ -1268,6 +1268,12 @@ filteredData.forEach(item => {
              actionButton = `<span class="text-xs text-gray-500">已簽核</span> ${deleteBtn}`; 
         }
     }
+	// 🚨 修正：確保 actionButton 絕不為空字串，以防前面邏輯因 userRole 未載入而出錯
+    if (!actionButton || actionButton.trim() === '') {
+        actionButton = `<span class="text-xs text-gray-500">無可用動作</span> ${deleteBtn}`;
+    }
+
+// ... 接下來是 tableHtml += `...` 的表格行組裝
     
     // ... (表格行 HTML 程式碼：將 actionButton 放入表格單元格)
     tableHtml += `
@@ -1537,6 +1543,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
