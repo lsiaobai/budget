@@ -1285,10 +1285,20 @@ filteredData.forEach(item => {
         </tr>
     `;
 });
-        
-        // --- 管理員後台功能 ---
+// 4. 結束表格
+tableHtml += `
+            </tbody>
+        </table>
+    `;
 
-        async function openAdminPanel() {
+// 5. 將 HTML 內容設置到容器
+tableContainer.innerHTML = tableHtml;
+} // <-- 這是 displayChecklistHistory 函數的結束
+
+// --- 管理員後台功能 --- (註釋和下一個函數之間不應有額外符號或不規則縮排)
+
+async function openAdminPanel() {
+    // ... openAdminPanel 的內容
             if (!isAdmin) return;
             document.getElementById('adminPanel').style.display = 'flex';
             
@@ -1529,6 +1539,7 @@ filteredData.forEach(item => {
     </script>
 </body>
 </html>
+
 
 
 
