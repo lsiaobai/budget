@@ -301,10 +301,10 @@
                 </div>
                 
                 <!-- 備註 -->
-                <div class="mt-6">
-                    <label for="notes" class="font-bold text-gray-800 mb-2 block">備註/修正說明</label>
-                   <textarea id="reviewNotes" name="reviewNotes" rows="3" placeholder="請填寫檢核意見或修正備註。" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-                </div>
+               <div class="mt-6">
+    				<label for="reviewNotes" class="font-bold text-gray-800 mb-2 block">備註/修正說明</label>
+   					 <textarea id="reviewNotes" name="reviewNotes" rows="3" placeholder="請填寫檢核意見或修正備註。" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+				</div>
 
                 <!-- 動作按鈕 -->
                 <div class="mt-8 flex flex-col sm:flex-row gap-4">
@@ -828,7 +828,9 @@ window.populateFilterOptions = function() {
             form.elements['accountNameId'].disabled = (mode !== 'new' && !isCreator);
 
             // 4. 備註欄位 (Notes) - 兩邊都可以寫，所以統一解鎖
-            form.elements['notes'].disabled = false;
+            if (form.elements['reviewNotes']) { // 安全檢查
+    form.elements['reviewNotes'].disabled = false;
+}
             
             // 5. 更新按鈕文字
             if (mode === 'new') {
@@ -895,7 +897,7 @@ window.populateFilterOptions = function() {
                 dataToSave = {
                     // 必須包含所有 Reviewer 欄位
                     ...reviewerFields.reduce((obj, key) => ({ ...obj, [key]: form.elements[key].value || '' }), {}),
-                    notes: form.elements['notes'].value, // 備註可修改
+               //     notes: form.elements['notes'].value, // 備註可修改
                     reviewer: form.elements['reviewer'].value, // 檢核人必填
                     result: form.elements['result'].value, // 結果必填
                     reviewTimestamp: serverTimestamp(), // 更新檢核時間
@@ -1586,6 +1588,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
