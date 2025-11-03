@@ -530,6 +530,7 @@
         let userId = null;
         let userEmail = null;
         let isAdmin = false;
+		let userRole = 'user';
         let checklistData = []; 
         let editingId = null; 
         let editMode = 'new'; // 'new', 'edit_executor', 'edit_reviewer'
@@ -690,39 +691,30 @@ window.populateFilterOptions = function() {
             const lowerCaseEmail = user.email ? user.email.toLowerCase() : '';
             
             try {
-                // 嘗試從 Firestore 獲取角色資訊
-                const roleSnapshot = await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH))); 
-                let foundRole = roleSnapshot.docs.find(d => d.id === user.uid)?.data();
-                
-                // 1. 檢查是否為預設管理者 (硬編碼)
-                if (lowerCaseEmail === DEFAULT_ADMIN_EMAIL) {
-                    isAdmin = true;
-                    // 確保預設管理者在 user_roles 中有記錄且角色正確
-                    if (!foundRole || foundRole.role !== 'admin' || foundRole.email.toLowerCase() !== lowerCaseEmail) {
-                        await setDoc(roleDocRef, { 
-                            email: user.email, 
-                            role: 'admin',
-                            lastLogin: serverTimestamp() 
-                        }, { merge: true });
-                    }
-                } else if (foundRole) {
-                    // 2. 檢查是否有已設定的角色
-                    isAdmin = foundRole.role === 'admin';
-                    // 更新登入時間
-                     await setDoc(roleDocRef, { 
-                        lastLogin: serverTimestamp() 
-                    }, { merge: true });
-                } else {
-                    // 3. 預設為一般使用者 (並記錄)
-                    isAdmin = false;
-                    await setDoc(roleDocRef, { 
-                        email: user.email, 
-                        role: 'user',
-                        lastLogin: serverTimestamp() 
-                    }, { merge: true });
-                }
+// 嘗試從 Firestore 獲取角色資訊
+			const roleSnapshot = await getDocs(query(collection(db, USER_ROLES_COLLECTION_PATH)));
+			let foundRoleData = roleSnapshot.docs.find(d => d.id === user.uid)?.data(); // 變數名稱修正
 
-                console.log(`User ${user.email} role: ${isAdmin ? 'Admin' : 'User'}`);
+			if (lowerCaseEmail === DEFAULT_ADMIN_EMAIL) {
+   			 // 1. 檢查是否為預設管理者 (硬編碼)
+    			isAdmin = true;
+   				 userRole = 'admin'; // 🚨 修正：設定 userRole
+  			 // ... (其他 setDoc 邏輯保持不變)
+
+				} else if (foundRoleData) {
+  				  // 2. 檢查是否有已設定的角色
+   				 isAdmin = foundRoleData.role === 'admin';
+				userRole = foundRoleData.role; // 🚨 修正：從 Firestore 角色資訊設定 userRole
+  				  // ... (其他 setDoc 邏輯保持不變)
+
+} else {
+    // 3. 預設為一般使用者 (並記錄)
+    isAdmin = false;
+    userRole = 'user'; // 🚨 修正：設定 userRole
+    // ... (其他 setDoc 邏輯保持不變)
+}
+
+	console.log(`User ${user.email} role: ${userRole} (Admin: ${isAdmin})`); // 修正 console 輸出
             } catch (e) {
                 console.error("Error checking user role:", e);
                 // 發生錯誤時，至少檢查是否為硬編碼管理者
@@ -1543,6 +1535,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
