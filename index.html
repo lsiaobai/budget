@@ -915,39 +915,75 @@ window.populateFilterOptions = function() {
             return dataToSave;
         }
 
-        // Save (Add or Update) to Firestore
-        async function saveChecklist(event) {
-            event.preventDefault(); 
-            if (!db || !userId) {
-                 showStatus("❌ 儲存失敗: 請先登入。", 'error');
-                 return;
-            }
-            
-            const data = collectFormData();
-            if (!data) return;
-            
-            // 新增資料時，使用 addDoc (Firestore 自動產生 ID)
-            const path = CHECKLIST_COLLECTION_PATH;
-            const docRef = editingId ? doc(db, path, editingId) : collection(db, path);
+// Save (Add or Update) to Firestore
+async function saveChecklist(event) {
+    event.preventDefault(); 
+    if (!db || !userId) {
+        showStatus("❌ 儲存失敗: 請先登入。", 'error');
+        return;
+    }
+    
+    // 1. 從表單收集所有可能的資料
+    const formData = collectFormData(); 
+    if (!formData) return;
+    
+    let updateData = {}; // 宣告乾淨的提交物件
+    
+    // 2. 根據模式篩選並構造提交物件 (核心修正點)
+    if (editMode === 'edit_reviewer') {
+        // 🚨 檢核者模式：只提交規則中允許的 10 個欄位
+        updateData = {
+            // 實際值欄位 (Reviewer 填寫)
+            actualOriginalAccountBudget: formData.actualOriginalAccountBudget || 0,
+            actualAccountBudgetAfterTopUp: formData.actualAccountBudgetAfterTopUp || 0,
+            actualSet: formData.actualSet || 0,
+            actualStartDate: formData.actualStartDate || '',
+            actualEndDate: formData.actualEndDate || '',
 
-            try {
-                if (editingId) {
-                    // Update existing document using setDoc (Firestore Rules will check permissions)
-                    await setDoc(doc(db, path, editingId), data, { merge: true });
-                    showStatus(`✅ 核對結果已成功更新 (${editMode})。`, 'success');
-                } else {
-                    // Add new document
-                    await addDoc(docRef, data);
-                    showStatus("✅ 執行設定已成功儲存並建立新紀錄。", 'success');
-                }
-                resetForm(); // Reset form after successful save/update
-                
-            } catch (e) {
-                console.error("Error saving document: ", e);
-                // 這裡會捕獲 'Missing or insufficient permissions.' 錯誤
-                showStatus(`❌ 儲存失敗: ${e.message}。請檢查您的 Firestore 安全規則！`, 'error');
+            // 簽核狀態欄位 (核心簽核標記)
+            reviewer: currentUser.displayName,
+            reviewerId: userId,
+            notes: formData.notes || '', // 備註 (必須在 hasOnly 列表中)
+            result: formData.result,
+            reviewTimestamp: serverTimestamp(), // 使用 Firestore 時間戳
+        };
+
+        // 清理空字串/零值，避免不必要的資料儲存
+        Object.keys(updateData).forEach(key => {
+             // 確保零值 (0) 不被刪除，但空字串可以刪除
+            if (updateData[key] === '') { 
+                delete updateData[key];
             }
+        });
+
+    } else if (editMode === 'edit_executor') {
+        // 執行者模式 (這裡需要根據執行者的規則來構造，但目前保持原樣，避免影響檢核修正)
+        updateData = formData; 
+    } else {
+        // 新增模式
+        updateData = formData;
+    }
+
+    const path = CHECKLIST_COLLECTION_PATH;
+    const docRef = doc(db, path, editingId); 
+    
+    try {
+        if (editingId) {
+            // 使用篩選後的 updateData
+            await setDoc(docRef, updateData, { merge: true }); 
+            showStatus(`✅ 核對結果已成功更新 (${editMode})。`, 'success');
+        } else {
+            // Add new document
+            await addDoc(docRef, updateData); 
+            showStatus("✅ 執行設定已成功儲存並建立新紀錄。", 'success');
         }
+        resetForm(); 
+        
+    } catch (e) {
+        console.error("Error saving document: ", e);
+        showStatus(`❌ 儲存失敗: ${e.message}。請檢查您的 Firestore 安全規則！`, 'error');
+    }
+}
 
         // Load data using onSnapshot (and re-render the history table)
         function loadChecklists() {
@@ -1537,6 +1573,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
