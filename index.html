@@ -933,20 +933,31 @@ async function saveChecklist(event) {
     if (editMode === 'edit_reviewer') {
         // 🚨 檢核者模式：只提交規則中允許的 10 個欄位
         updateData = {
-            // 實際值欄位 (Reviewer 填寫)
-            actualOriginalAccountBudget: formData.actualOriginalAccountBudget || 0,
-            actualAccountBudgetAfterTopUp: formData.actualAccountBudgetAfterTopUp || 0,
-            actualSet: formData.actualSet || 0,
-            actualStartDate: formData.actualStartDate || '',
-            actualEndDate: formData.actualEndDate || '',
+    // 核心簽核欄位 (必須提交)
+    reviewer: currentUser.displayName,
+    reviewerId: userId,
+    result: formData.result,
+    reviewTimestamp: serverTimestamp(), 
+    // notes 是選填的，讓它保持在 if 判斷之外，讓 Object.keys 清理
+    notes: formData.notes || '', 
+};
 
-            // 簽核狀態欄位 (核心簽核標記)
-            reviewer: currentUser.displayName,
-            reviewerId: userId,
-            notes: formData.notes || '', // 備註 (必須在 hasOnly 列表中)
-            result: formData.result,
-            reviewTimestamp: serverTimestamp(), // 使用 Firestore 時間戳
-        };
+// 只有在欄位有值時，才將其加入 updateData
+if (formData.actualOriginalAccountBudget) {
+    updateData.actualOriginalAccountBudget = formData.actualOriginalAccountBudget;
+}
+if (formData.actualAccountBudgetAfterTopUp) {
+    updateData.actualAccountBudgetAfterTopUp = formData.actualAccountBudgetAfterTopUp;
+}
+if (formData.actualSet) {
+    updateData.actualSet = formData.actualSet;
+}
+if (formData.actualStartDate) {
+    updateData.actualStartDate = formData.actualStartDate;
+}
+if (formData.actualEndDate) {
+    updateData.actualEndDate = formData.actualEndDate;
+}
 
         // 清理空字串/零值，避免不必要的資料儲存
         Object.keys(updateData).forEach(key => {
@@ -1573,6 +1584,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
