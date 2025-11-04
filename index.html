@@ -557,6 +557,7 @@
         // --- Firestore 路徑 ---
         const CHECKLIST_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/budget_checklists`;
         const USER_ROLES_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/user_roles`;
+		const USERS_COLLECTION_PATH = `/artifacts/${finalAppId}/public/data/users`;
         
         // --- 管理者硬編碼郵箱 (預設管理者) ---
         // 確保使用小寫進行穩定的比較
@@ -1472,72 +1473,110 @@ function populateFilterOptions() {
 
 async function openAdminPanel() {
     // ... openAdminPanel 的內容
-            if (!isAdmin) return;
-            document.getElementById('adminPanel').style.display = 'flex';
-            
-            const userListContainer = document.getElementById('userListContainer');
-            userListContainer.innerHTML = '<p class="text-center text-gray-500">載入用戶中...</p>';
+    if (!isAdmin) return;
+    document.getElementById('adminPanel').style.display = 'flex';
+    
+    const userListContainer = document.getElementById('userListContainer');
+    userListContainer.innerHTML = '<p class="text-center text-gray-500">載入用戶中...</p>';
 
-            try {
-                // 確保從最新的數據庫狀態獲取角色
-                const q = collection(db, USER_ROLES_COLLECTION_PATH);
-                const querySnapshot = await getDocs(q);
-                
-                let userListHtml = '';
-                querySnapshot.forEach(docSnapshot => {
-                    const docId = docSnapshot.id;
-                    const userData = docSnapshot.data();
-                    const currentIsAdminRole = userData.role === 'admin';
-                    const isCurrentUser = docId === userId;
-                    const userEmail = userData.email;
-                    const isDefaultAdmin = userEmail && userEmail.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
+    try {
+        // --- 1. 讀取所有登入過的使用者基本資料 (來自 USERS 集合) ---
+        // 🚨 關鍵修正：從 users 集合讀取所有登入用戶
+        const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION_PATH));
+        const allUsersMap = {};
+        
+        // 遍歷 users 集合，建立以 UID 為鍵的 Map
+        usersSnapshot.forEach(doc => {
+            allUsersMap[doc.id] = {
+                ...doc.data(),
+                role: 'user' // 預設角色為一般用戶
+            };
+        });
 
-                    // 權限變更按鈕
-                    const toggleButtonText = currentIsAdminRole ? '降級為一般用戶' : '升級為管理者';
-                    const toggleButtonColor = currentIsAdminRole ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600';
-                    let toggleButtonDisabled = isCurrentUser ? 'disabled' : ''; // 無法修改自己的權限
-                    if (isDefaultAdmin && currentIsAdminRole) {
-                        // 預設管理者無法被降級
-                        toggleButtonDisabled = 'disabled';
-                    }
+        // --- 2. 讀取所有已設定的角色 (來自 USER_ROLES 集合) ---
+        // 讀取角色集合
+        const rolesSnapshot = await getDocs(collection(db, USER_ROLES_COLLECTION_PATH));
+        
+        // 遍歷 user_roles 集合，更新 allUsersMap 中的角色
+        rolesSnapshot.forEach(doc => {
+            const roleData = doc.data();
+            const uid = doc.id;
 
-                    const toggleButtonClass = toggleButtonDisabled ? 'opacity-50 cursor-not-allowed' : '';
-                    const userRoleText = currentIsAdminRole ? '管理者' : '一般用戶';
-
-                    // 移除角色記錄按鈕 (移除 Firestore 中的 user_roles 記錄)
-                    const removeButton = !isCurrentUser && !isDefaultAdmin ? 
-                        `<button onclick="window.removeUserRoleRecord('${docId}')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-bold py-1 px-2 rounded-lg transition duration-150 ml-2">移除記錄</button>` 
-                        : '';
-
-                    userListHtml += `
-                        <div class="flex items-center justify-between p-3 border-b">
-                            <div>
-                                <p class="font-medium text-gray-900 break-all">${userData.email} 
-                                    ${isDefaultAdmin ? '<span class="text-xs text-yellow-600">(預設管理員)</span>' : ''}
-                                </p>
-                                <p class="text-sm text-gray-500">ID: ${docId.substring(0, 8)}... (${userRoleText})</p>
-                            </div>
-                            <div class="flex items-center">
-                                <button 
-                                    id="roleBtn-${docId}"
-                                    onclick="window.toggleUserRole('${docId}', '${currentIsAdminRole}')"
-                                    class="${toggleButtonColor} text-white text-xs font-bold py-1 px-2 rounded-lg transition duration-150 ${toggleButtonClass}"
-                                    ${toggleButtonDisabled}>
-                                    ${isCurrentUser ? '自己的權限' : toggleButtonText}
-                                </button>
-                                ${removeButton}
-                            </div>
-                        </div>
-                    `;
-                });
-
-                userListContainer.innerHTML = userListHtml || '<p class="text-center text-gray-500">目前沒有其他用戶記錄。</p>';
-
-            } catch (e) {
-                userListContainer.innerHTML = `<p class="text-red-500">載入用戶列表失敗: ${e.message}</p>`;
-                console.error("Error loading user roles:", e);
+            // 如果該用戶在 users 集合中存在，則更新其角色
+            if (allUsersMap[uid]) {
+                allUsersMap[uid].role = roleData.role;
+            } else {
+                // 如果角色集合中有，但在 users 集合中沒有 (可能是舊資料)，則將其加入
+                // 注意：這裡假設 user_roles 中包含 email 欄位，但我們應該依賴 users 集合的 email
+                // 為了確保列表完整性，我們強制加入 email 和 role
+                allUsersMap[uid] = {
+                    uid: uid,
+                    email: roleData.email || 'N/A (僅有角色記錄)',
+                    role: roleData.role
+                };
             }
-        }
+        });
+        
+        // 3. 處理並顯示列表
+        let userListHtml = '';
+        
+        // 將 Map 轉換為陣列並排序 (可選：依 Email 排序)
+        const sortedUsers = Object.values(allUsersMap).sort((a, b) => a.email.localeCompare(b.email));
+
+        sortedUsers.forEach(userData => {
+            const docId = userData.uid;
+            // 由於我們是從 users 集合讀取，userData 總是包含 email 和 uid
+            const currentIsAdminRole = userData.role === 'admin';
+            const isCurrentUser = docId === userId;
+            const userEmail = userData.email;
+            const isDefaultAdmin = userEmail && userEmail.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
+
+            // 權限變更按鈕 (以下邏輯保持不變)
+            const toggleButtonText = currentIsAdminRole ? '降級為一般用戶' : '升級為管理者';
+            const toggleButtonColor = currentIsAdminRole ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600';
+            let toggleButtonDisabled = isCurrentUser ? 'disabled' : ''; // 無法修改自己的權限
+            if (isDefaultAdmin && currentIsAdminRole) {
+                // 預設管理者無法被降級
+                toggleButtonDisabled = 'disabled';
+            }
+
+            const toggleButtonClass = toggleButtonDisabled ? 'opacity-50 cursor-not-allowed' : '';
+            const userRoleText = currentIsAdminRole ? '管理者' : '一般用戶';
+
+            // 移除角色記錄按鈕 (移除 Firestore 中的 user_roles 記錄)
+            const removeButton = !isCurrentUser && !isDefaultAdmin ?
+                `<button onclick="window.removeUserRoleRecord('${docId}')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-bold py-1 px-2 rounded-lg transition duration-150 ml-2">移除記錄</button>`
+                : '';
+
+            userListHtml += `
+                <div class="flex items-center justify-between p-3 border-b">
+                    <div>
+                        <p class="font-medium text-gray-900 break-all">${userData.email}
+                            ${isDefaultAdmin ? '<span class="text-xs text-yellow-600">(預設管理員)</span>' : ''}
+                        </p>
+                        <p class="text-sm text-gray-500">ID: ${docId.substring(0, 8)}... (${userRoleText})</p>
+                    </div>
+                    <div class="flex items-center">
+                        <button
+                            id="roleBtn-${docId}"
+                            onclick="window.toggleUserRole('${docId}', '${currentIsAdminRole}')"
+                            class="${toggleButtonColor} text-white text-xs font-bold py-1 px-2 rounded-lg transition duration-150 ${toggleButtonClass}"
+                            ${toggleButtonDisabled}>
+                            ${isCurrentUser ? '自己的權限' : toggleButtonText}
+                        </button>
+                        ${removeButton}
+                    </div>
+                </div>
+            `;
+        });
+
+        userListContainer.innerHTML = userListHtml || '<p class="text-center text-gray-500">目前沒有其他用戶記錄。</p>';
+
+    } catch (e) {
+        userListContainer.innerHTML = `<p class="text-red-500">載入用戶列表失敗: ${e.message}</p>`;
+        console.error("Error loading user list:", e);
+    }
+}
         
         async function toggleUserRole(targetUserId, currentIsAdminString) {
             if (!isAdmin) return;
@@ -1711,6 +1750,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
