@@ -933,8 +933,12 @@ function collectFormData() {
 } else if (editMode === 'edit_reviewer') {
         // 檢核者模式：只收集檢核相關的欄位（表單元素）
         dataToSave = {
-            // 【新增這行】讓 saveChecklist 可以讀取使用者手動輸入的檢核人名稱
-            reviewer: form.elements.reviewer.value || '', 
+            // 【已存在】讓 saveChecklist 可以讀取使用者手動輸入的檢核人名稱
+            reviewer: form.elements.reviewer.value || '', 
+            
+            // 💡 關鍵新增：收集登入者的 Email，以便在 saveChecklist 中使用
+            reviewerEmail: userEmail, 
+            
             // 收集檢核人備註和結果
             reviewNotes: form.elements.reviewNotes.value || '',
             result: form.elements.result.value || 'pass',
@@ -1190,12 +1194,12 @@ window.showDetailModal = function(id) {
             </div>
 
             <h4 class="text-lg font-bold mt-6 mb-2 pt-2 border-t">人員與時間</h4>
-            <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                <div><span class="font-semibold">執行人:</span> ${item.executor} (${item.creatorEmail || 'N/A'})</div>
-                <div><span class="font-semibold">執行時間:</span> ${item.executionTimestampDisplay || 'N/A'}</div>
-                <div><span class="font-semibold">檢核人:</span> ${item.reviewer || 'N/A'}</div>
+				<div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div><span class="font-semibold">執行人:</span> ${item.executor} (${item.creatorEmail || 'N/A'})</div>
+                <div><span class="font-semibold">執行時間:</span> ${item.executionTimestampDisplay || 'N/A'}</div>
+                <div><span class="font-semibold">檢核人:</span> ${item.reviewer || 'N/A'} (${item.reviewerEmail || 'N/A'})</div>
                 <div><span class="font-semibold">檢核時間:</span> ${item.reviewTimestampDisplay || 'N/A'}</div>
-            </div>
+            </div>
 
             <h4 class="text-lg font-bold mt-6 mb-2 pt-2 border-t text-indigo-800">廣告活動與預算細節</h4>
             <div class="border border-gray-200 rounded-lg p-3 bg-white space-y-3">
@@ -1322,7 +1326,22 @@ filteredData.forEach(item => {
                        '📝 待執行';
     
     let actionButton = ''; // 初始化為空
+
+	// 🚨 在這裡準備檢核人的顯示內容
+    const reviewerName = item.reviewer || 'N/A';
+    const reviewerEmail = item.reviewerEmail; // 讀取我們在 saveChecklist 中新增的欄位
     
+    let reviewerDisplay;
+    if (reviewerEmail && reviewerName !== 'N/A') {
+        // 格式化為：名稱 (Email)
+        reviewerDisplay = `${reviewerName} (${reviewerEmail})`;
+    } else if (reviewerEmail) {
+        // 如果只有 Email，則只顯示 Email
+        reviewerDisplay = reviewerEmail;
+    } else {
+        reviewerDisplay = reviewerName;
+    }
+	
     // --- 動作按鈕邏輯 ---
     // 管理者專屬的刪除按鈕
     const deleteBtn = isAdmin ? `
@@ -1376,19 +1395,21 @@ filteredData.forEach(item => {
 
 // ... 接下來是 tableHtml += `...` 的表格行組裝
     
-    // ... (表格行 HTML 程式碼：將 actionButton 放入表格單元格)
-    tableHtml += `
-        <tr id="row-${item.id}">
-            <td class="text-gray-500 text-xs">${item.id.substring(0, 4)}...</td>
+// ... (表格行 HTML 程式碼：將 actionButton 放入表格單元格)
+    tableHtml += `
+        <tr id="row-${item.id}">
+            <td class="text-gray-500 text-xs">${item.id.substring(0, 4)}...</td>
 			<td class="text-sm">${item.executionTimestampDisplay}</td>
 			<td class="font-medium text-gray-700">${item.clientName}</td>
 			<td>${item.executor} (${item.creatorEmail || 'N/A'})</td>
-			<td>${item.reviewer || 'N/A'}</td>
+            
+            <td>${reviewerDisplay}</td> 
+            
 			<td><span class="inline-block px-3 py-1 text-xs font-semibold rounded-full ${statusClass}">${resultText}</span></td>
 			<td>${actionButton}</td>
 			<td><button onclick="showDetailModal('${item.id}')" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">查看</button></td>
 		</tr>
-    `;
+    `;
 });
 // 4. 結束表格
 tableHtml += `
@@ -1753,6 +1774,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
