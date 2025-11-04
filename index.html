@@ -741,10 +741,13 @@ async function checkUserRole(user) {
         }
         
         // 確保角色資訊被同步回 Firestore (尤其對於新的使用者)
+// 🚨 暫時註釋掉這個寫入操作！
+        /*
         await setDoc(userDocRef, { 
             role: userRole,
             isAdmin: isAdmin 
         }, { merge: true });
+        */
 
         console.log(`User ${user.email} role: ${userRole} (Admin: ${isAdmin})`);
 } catch (e) {
@@ -1746,6 +1749,7 @@ async function toggleUserRole(targetUserId, currentIsAdminString) {
     </script>
 </body>
 </html>
+
 
 
 
