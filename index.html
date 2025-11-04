@@ -795,7 +795,7 @@ function handleAuthStateChange(user) {
         };
         
         // 確保在檢查角色之前執行同步
-        syncUserData(); 
+        //syncUserData(); // 
         
         // 清除登入錯誤提示
         showStatus('', 'info', 'authStatus');
@@ -1741,6 +1741,7 @@ async function toggleUserRole(targetUserId, currentIsAdminString) {
     </script>
 </body>
 </html>
+
 
 
 
