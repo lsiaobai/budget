@@ -463,7 +463,7 @@
             }
 
             if (isNaN(dailyBudget) || dailyBudget <= 0) {
-                resultEl.textContent = '計算失敗：請輸入有效的「廣告活動預算金額 (執行設定)」。';
+                resultEl.textContent = '計算失敗：請輸入有效的「廣告活動日預算金額 (執行設定)」。';
                 resultEl.classList.add('text-red-600');
                 return;
             }
@@ -1189,7 +1189,7 @@ window.showDetailModal = function(id) {
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 p-2 bg-yellow-100 rounded-lg">
-                    <span class="font-bold text-gray-700">廣告活動預算金額:</span>
+                    <span class="font-bold text-gray-700">廣告活動日預算金額:</span>
                     <div>
                         <div class="text-sm"><span class="font-semibold text-red-600">執行數值:</span> ${formatNumber(item.targetAmount)}</div>
                         <div class="text-sm"><span class="font-semibold text-green-600">檢核設定值:</span> ${formatNumber(item.actualSet)}</div>
@@ -1682,6 +1682,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
