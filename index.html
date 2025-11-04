@@ -747,12 +747,17 @@ async function checkUserRole(user) {
         }, { merge: true });
 
         console.log(`User ${user.email} role: ${userRole} (Admin: ${isAdmin})`);
-    } catch (e) {
-        console.error("Error checking user role:", e);
-        // 發生錯誤時，至少檢查是否為硬編碼管理者
-        isAdmin = (lowerCaseEmail === DEFAULT_ADMIN_EMAIL);
-        userRole = isAdmin ? 'admin' : 'user'; // 設置 fallback 角色
-    }
+} catch (e) {
+    console.error("Error checking user role:", e);
+    
+    // 發生錯誤時，至少檢查是否為硬編碼管理者
+    // 💡 雖然發生錯誤，但仍嘗試檢查硬編碼管理者（僅為 fallback）
+    isAdmin = (user.email.toLowerCase() === DEFAULT_ADMIN_EMAIL);
+    userRole = isAdmin ? 'admin' : 'user'; 
+    
+    // 🚨 關鍵修正：將錯誤拋出，讓 handleAuthStateChange 的 .catch 捕捉到
+    // 這樣登入流程就不會默默卡住
+    throw e; 
 }
 
 //***處理身份驗證狀態改變
@@ -1741,6 +1746,7 @@ async function toggleUserRole(targetUserId, currentIsAdminString) {
     </script>
 </body>
 </html>
+
 
 
 
