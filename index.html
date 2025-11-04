@@ -694,8 +694,6 @@ window.populateFilterOptions = function() {
 
 /**
  * 檢查用戶角色並儲存/更新到 Firestore
- * 💡 修正：將路徑統一到 artifacts/{appId}/public/data/users
- * 💡 優化：使用 getDoc(單文件讀取) 提升效率
  */
 async function checkUserRole(user) {
     if (!db || !user) {
@@ -704,7 +702,7 @@ async function checkUserRole(user) {
         return;
     }
 
-    // 💡 關鍵修正：定義正確的 Collection 路徑
+    // 💡 關鍵修正：使用外部的 finalAppId 變數來構建正確的路徑
     const userCollectionPath = `artifacts/${finalAppId}/public/data/users`; 
     const userDocRef = doc(db, userCollectionPath, user.uid);
 
@@ -722,15 +720,13 @@ async function checkUserRole(user) {
             userRole = 'admin'; 
         } else if (foundRoleData) {
             // 2. 檢查是否有已設定的角色
-            // 假設 isAdmin/role 欄位是儲存在 user Document 中
-            // 優先檢查 role 欄位，如果沒有則根據 isAdmin 判斷
             const roleFromDB = foundRoleData.role;
             
             if (roleFromDB) {
                 userRole = roleFromDB;
                 isAdmin = roleFromDB === 'admin';
             } else if (foundRoleData.isAdmin !== undefined) {
-                isAdmin = !!foundRoleData.isAdmin; // 確保布林值
+                isAdmin = !!foundRoleData.isAdmin;
                 userRole = isAdmin ? 'admin' : 'user';
             } else {
                  // 設置預設值
@@ -747,7 +743,7 @@ async function checkUserRole(user) {
         // 確保角色資訊被同步回 Firestore (尤其對於新的使用者)
         await setDoc(userDocRef, { 
             role: userRole,
-            isAdmin: isAdmin // 保險起見也寫入 isAdmin
+            isAdmin: isAdmin 
         }, { merge: true });
 
         console.log(`User ${user.email} role: ${userRole} (Admin: ${isAdmin})`);
@@ -758,14 +754,6 @@ async function checkUserRole(user) {
         userRole = isAdmin ? 'admin' : 'user'; // 設置 fallback 角色
     }
 }
-
-	console.log(`User ${user.email} role: ${userRole} (Admin: ${isAdmin})`); // 修正 console 輸出
-            } catch (e) {
-                console.error("Error checking user role:", e);
-                // 發生錯誤時，至少檢查是否為硬編碼管理者
-                isAdmin = (lowerCaseEmail === DEFAULT_ADMIN_EMAIL); 
-            }
-        }
 
 //***處理身份驗證狀態改變
 function handleAuthStateChange(user) {
@@ -1753,6 +1741,7 @@ async function toggleUserRole(targetUserId, currentIsAdminString) {
     </script>
 </body>
 </html>
+
 
 
 
