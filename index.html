@@ -737,95 +737,98 @@ window.populateFilterOptions = function() {
             }
         }
 
-        /**
-         * 處理身份驗證狀態改變
-         */
-        function handleAuthStateChange(user) {
-            const authButton = document.getElementById('authButton');
-            const userEmailDisplay = document.getElementById('userEmailDisplay');
-            const adminPanelButton = document.getElementById('adminPanelButton');
+//***處理身份驗證狀態改變
+function handleAuthStateChange(user) {
+    // 確保 finalAppId 在這裡可訪問
+    // 💡 假設 finalAppId 已在外部或頂部定義，例如：
+    // const finalAppId = canvasAppId || userFirebaseConfig.projectId || 'default-external-app-id';
+    
+    const authButton = document.getElementById('authButton');
+    const userEmailDisplay = document.getElementById('userEmailDisplay');
+    const adminPanelButton = document.getElementById('adminPanelButton');
+    
+    currentUser = user;
+    
+    if (user) {
+        userId = user.uid;
+        // 修正 user.email 可能為 null 的問題，並確保用於顯示
+        userEmail = user.email || '未提供 Email';
+        
+        // 💡 【修正後】步驟：將使用者資訊同步到 Firestore 的 'users' 集合
+        const syncUserData = async () => {
+            // 🚨 關鍵修正：使用 finalAppId 和完整路徑 (artifacts/{appId}/public/data/users/{userId})
+            const userRef = doc(db, `artifacts/${finalAppId}/public/data/users`, user.uid);
             
-            currentUser = user;
+            const userData = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || user.email,
+                lastLogin: serverTimestamp() // 更新登入時間
+            };
             
-			if (user) {
-                userId = user.uid;
-                // 修正 user.email 可能為 null 的問題，並確保用於顯示
-                userEmail = user.email || '未提供 Email'; 
-                
-                // 💡 【新增】步驟：將使用者資訊同步到 Firestore 的 'users' 集合
-                const syncUserData = async () => {
-                    const userRef = doc(db, "users", user.uid); // 假設集合名為 'users'
-                    const userData = {
-                        uid: user.uid,
-                        email: user.email,
-                        displayName: user.displayName || user.email,
-                        lastLogin: serverTimestamp() // 更新登入時間
-                    };
-                    
-                    try {
-                        // 使用 merge: true，這樣只更新 lastLogin，且不會覆蓋 'isAdmin' 等其他欄位
-                        await setDoc(userRef, userData, { merge: true });
-                        console.log("User data synchronized to Firestore.");
-                    } catch (e) {
-                        console.error("Error synchronizing user data:", e);
-                    }
-                };
-                
-                // 確保在檢查角色之前執行同步
-                syncUserData(); 
-                // 💡 確保您在檔案開頭有 import doc 和 setDoc
-                // import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-
-                // 清除登入錯誤提示
-                showStatus('', 'info', 'authStatus');
-
-                document.getElementById('loadingIndicator').classList.remove('hidden');
-
-                // 檢查角色
-                checkUserRole(user).then(() => {
-                    // 更新 UI 狀態
-                    authButton.textContent = '登出';
-                    authButton.onclick = googleSignOut;
-                    
-                    // 修正 userEmail 顯示 null 的問題
-                    userEmailDisplay.innerHTML = `**${userEmail}** (${isAdmin ? '管理者' : '一般用戶'})`;
-                    document.getElementById('checklistForm').classList.remove('hidden');
-                    
-                    
-                    document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false);
-
-                    if (isAdmin) {
-                        adminPanelButton.classList.remove('hidden');
-                        adminPanelButton.onclick = openAdminPanel;
-                    } else {
-                         adminPanelButton.classList.add('hidden');
-                    }
-                    
-                    loadChecklists(); // 登入後載入資料
-                    document.getElementById('loadingIndicator').classList.add('hidden');
-
-                }).catch(e => {
-                    console.error("Role check failed:", e);
-                    showStatus(`角色檢查失敗: ${e.message}。請檢查 Firestore 規則。`, 'error');
-                    document.getElementById('loadingIndicator').classList.add('hidden');
-                });
-
-            } else {
-                // 未登入狀態
-                userId = null;
-                userEmail = null;
-                isAdmin = false;
-                authButton.textContent = '登入 Google';
-                authButton.onclick = googleSignIn;
-                userEmailDisplay.innerHTML = '請登入 Google';
-                document.getElementById('checklistForm').classList.add('hidden');
-                document.getElementById('historyTableContainer').innerHTML = '<p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>';
-                document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true);
-                adminPanelButton.classList.add('hidden');
-                document.getElementById('loadingIndicator').classList.add('hidden');
-                showStatus("您已登出。", 'info');
+            try {
+                // 使用 merge: true，這樣只更新 lastLogin，且不會覆蓋 'isAdmin' 等其他欄位
+                await setDoc(userRef, userData, { merge: true });
+                console.log("User data synchronized to Firestore at:", finalAppId);
+            } catch (e) {
+                console.error("Error synchronizing user data:", e);
+                // 如果您在 Console 看到 'Permission denied'，請檢查 Firestore 安全規則
             }
-        }
+        };
+        
+        // 確保在檢查角色之前執行同步
+        syncUserData(); 
+        
+        // 清除登入錯誤提示
+        showStatus('', 'info', 'authStatus');
+
+        document.getElementById('loadingIndicator').classList.remove('hidden');
+
+        // 檢查角色
+        checkUserRole(user).then(() => {
+            // 更新 UI 狀態
+            authButton.textContent = '登出';
+            authButton.onclick = googleSignOut;
+            
+            // 修正 userEmail 顯示 null 的問題
+            userEmailDisplay.innerHTML = `**${userEmail}** (${isAdmin ? '管理者' : '一般用戶'})`;
+            document.getElementById('checklistForm').classList.remove('hidden');
+            
+            
+            document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = false);
+
+            if (isAdmin) {
+                adminPanelButton.classList.remove('hidden');
+                adminPanelButton.onclick = openAdminPanel;
+            } else {
+                adminPanelButton.classList.add('hidden');
+            }
+            
+            loadChecklists(); // 登入後載入資料
+            document.getElementById('loadingIndicator').classList.add('hidden');
+
+        }).catch(e => {
+            console.error("Role check failed:", e);
+            showStatus(`角色檢查失敗: ${e.message}。請檢查 Firestore 規則。`, 'error');
+            document.getElementById('loadingIndicator').classList.add('hidden');
+        });
+
+    } else {
+        // 未登入狀態
+        userId = null;
+        userEmail = null;
+        isAdmin = false;
+        authButton.textContent = '登入 Google';
+        authButton.onclick = googleSignIn;
+        userEmailDisplay.innerHTML = '請登入 Google';
+        document.getElementById('checklistForm').classList.add('hidden');
+        document.getElementById('historyTableContainer').innerHTML = '<p class="text-gray-500 p-4 text-center">請先登入以查看共享歷史記錄...</p>';
+        document.querySelectorAll('#saveButton, #newRecordButton, #exportButton').forEach(btn => btn.disabled = true);
+        adminPanelButton.classList.add('hidden');
+        document.getElementById('loadingIndicator').classList.add('hidden');
+        showStatus("您已登出。", 'info');
+    }
+}
         
         // --- 表單流程控制 ---
 
@@ -1708,6 +1711,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
