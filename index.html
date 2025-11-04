@@ -973,12 +973,16 @@ async function saveChecklist(event) {
         // 🚨 檢核者模式：只構造規則中允許的欄位
         updateData = {
             // 核心簽核欄位 (必須提交)
-            reviewer: currentUser.displayName,
+            // ✅ 修正點：優先使用 collectFormData 收集到的 reviewer 值 (手動輸入名)，
+            //     如果表單欄位沒值，才使用 currentUser.displayName 作為預設
+            reviewer: formData.reviewer || currentUser.displayName,
             reviewerId: userId,
             result: formData.result,
             reviewTimestamp: serverTimestamp(), 
         };
 
+        // ... (其餘邏輯保持不變)
+        
         // 只有在欄位有值時，才將其加入 updateData
         if (formData.reviewNotes !== undefined && formData.reviewNotes !== null) { 
             // 移除前後空白，如果內容非空，則賦值
@@ -1002,16 +1006,16 @@ async function saveChecklist(event) {
             }
         });
         
-} else if (editMode === 'edit_executor' || !editingId) {
-    // 執行者模式 或 新增模式：使用所有表單資料
-    updateData = {
-        ...formData,
-        // 💡 修正執行人名稱：使用表單上的值 (formData.executor)，如果沒有才使用 currentUser.displayName
-        executor: formData.executor || currentUser.displayName, 
-        creatorEmail: currentUser.email, // 保持 Email 不變
-        createdByUserId: userId, 
-        executionTimestamp: serverTimestamp(), 
-    };
+    } else if (editMode === 'edit_executor' || !editingId) {
+        // 執行者模式 或 新增模式：使用所有表單資料
+        updateData = {
+            ...formData,
+            // 💡 修正執行人名稱：使用表單上的值 (formData.executor)，如果沒有才使用 currentUser.displayName
+            executor: formData.executor || currentUser.displayName, 
+            creatorEmail: currentUser.email, // 保持 Email 不變
+            createdByUserId: userId, 
+            executionTimestamp: serverTimestamp(), 
+        };
 
         // 清理 reviewNotes 和 reviewer 欄位，確保執行人模式不會提交舊的簽核資料
         delete updateData.reviewer;
@@ -1019,8 +1023,8 @@ async function saveChecklist(event) {
         delete updateData.reviewNotes;
         delete updateData.reviewTimestamp;
         delete updateData.result; // 重設簽核結果為 '待執行' 或空，讓檢核人重新簽核
-    
-    } else {
+    
+    } else {
         // Fallback，不應發生
         console.warn("Unknown edit mode or logic error in saveChecklist.");
         updateData = formData;
@@ -1052,7 +1056,6 @@ async function saveChecklist(event) {
         showStatus(`❌ 儲存失敗: ${e.message}。請檢查您的 Firestore 安全規則！`, 'error');
     }
 }
-
         // Load data using onSnapshot (and re-render the history table)
         function loadChecklists() {
             if (!db || !userId) return;
@@ -1750,6 +1753,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
