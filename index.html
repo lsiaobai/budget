@@ -1357,15 +1357,6 @@ tableHtml += `
 tableContainer.innerHTML = tableHtml;
 } // <-- 這是 displayChecklistHistory 函數的結束
 
-// 【新增 1: currentFilters 變數】
-// 💡 確保在文件頂部（全域作用域）定義了這個變數
-// 這是儲存篩選狀態的關鍵，如果尚未定義請新增它：
-let currentFilters = {
-    executor: 'all',
-    reviewer: 'all',
-    result: 'all'
-};
-
 // 【新增 2: 處理篩選變化的函數】
 function handleFilterChange(event) {
     const key = event.target.getAttribute('data-filter-key');
@@ -1682,6 +1673,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
