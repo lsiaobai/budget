@@ -1025,11 +1025,16 @@ async function saveChecklist(event) {
             // 核心簽核欄位 (必須提交)
             reviewer: currentUser.displayName,
             reviewerId: userId,
-	    reviewerEmail: currentUser.Email, // <--- 【修改點 3】：新增儲存檢核人 Email
+	       // reviewerEmail: currentUser.Email, // <--- 【修改點 3】：新增儲存檢核人 Email
             result: formData.result,
             reviewTimestamp: serverTimestamp(), 
         };
-
+		
+		// 💡 修正點：只有當 userEmail 存在時，才將 reviewerEmail 加入 updateData
+        if (userEmail) {
+            updateData.reviewerEmail = userEmail;
+        }
+		
         // 只有在欄位有值時，才將其加入 updateData
         if (formData.reviewNotes !== undefined && formData.reviewNotes !== null) { 
             // 移除前後空白，如果內容非空，則賦值
@@ -1816,3 +1821,4 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
