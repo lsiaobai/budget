@@ -1025,7 +1025,7 @@ async function saveChecklist(event) {
             // 核心簽核欄位 (必須提交)
             reviewer: currentUser.displayName,
             reviewerId: userId,
-	    reviewerEmail: userEmail, // <--- 【修改點 3】：新增儲存檢核人 Email
+	    reviewerEmail: currentUser.Email, // <--- 【修改點 3】：新增儲存檢核人 Email
             result: formData.result,
             reviewTimestamp: serverTimestamp(), 
         };
@@ -1816,9 +1816,3 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
-
-
-
-
-
-
