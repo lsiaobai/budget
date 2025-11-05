@@ -198,7 +198,7 @@
               		      <label class="block text-xs font-semibold mb-1">合約總額或活動預算總額</label>
                 </td>
                 <td class="input-group executor-field">
-                    <input type="number" name="targetTotalBudget" placeholder="執行數值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-red-600 font-semibold" required>
+                    <input type="number" name="targetTotalBudget" placeholder="執行數值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-red-600 font-semibold">
                 </td>
                 <td class="input-group reviewer-field">
                     <input type="number" name="actualTotalBudget" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-green-600 font-semibold">
@@ -983,13 +983,14 @@ function collectFormData() {
             // 【新增這行】讓 saveChecklist 可以讀取使用者手動輸入的檢核人名稱
             reviewer: form.elements.reviewer.value || '', 
             // 收集檢核人備註和結果
-	   	    reviewerEmail: userEmail,
+	    reviewerEmail: userEmail,
+            //reviewerId: userId,
             reviewNotes: form.elements.reviewNotes.value || '',
             result: form.elements.result.value || 'pass',
             // 收集 actual... 欄位（如果在檢核模式下允許修改）
             actualOriginalAccountBudget: form.elements.actualOriginalAccountBudget.value || '',
             actualAccountBudgetAfterTopUp: form.elements.actualAccountBudgetAfterTopUp.value || '',
-	        actualTotalBudget: form.elements.actualTotalBudget.value || '', // <--- 【修改點 1】：新增收集廣告總預算 (檢核人部分)
+	    actualTotalBudget: form.elements.actualTotalBudget.value || '', // <--- 【修改點 1】：新增收集廣告總預算 (檢核人部分)
             actualSet: form.elements.actualSet.value || '',
             actualStartDate: form.elements.actualStartDate.value || '',
             actualEndDate: form.elements.actualEndDate.value || '',
@@ -1021,10 +1022,12 @@ async function saveChecklist(event) {
     if (editMode === 'edit_reviewer') {
         // 🚨 檢核者模式：只構造規則中允許的欄位
         updateData = {
+            ...formData,
+            // 💡 修正檢核人名稱：使用表單上的值 (formData.reviewer)，如果沒有才使用 currentUser.displayName
+            reviewer: formData.reviewer || currentUser.displayName, 
             // 核心簽核欄位 (必須提交)
-            reviewer: currentUser.displayName,
-           // reviewerId: userId,
-	       // reviewerEmail: currentUser.Email, // <--- 【修改點 3】：新增儲存檢核人 Email
+            reviewerId: userId,
+	    // reviewerEmail: currentUser.Email, // <--- 【修改點 3】：新增儲存檢核人 Email
             result: formData.result,
             reviewTimestamp: serverTimestamp(), 
         };
