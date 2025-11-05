@@ -989,7 +989,7 @@ function collectFormData() {
             // 收集 actual... 欄位（如果在檢核模式下允許修改）
             actualOriginalAccountBudget: form.elements.actualOriginalAccountBudget.value || '',
             actualAccountBudgetAfterTopUp: form.elements.actualAccountBudgetAfterTopUp.value || '',
-			actualTotalBudget: form.elements.actualTotalBudget.value || '', // <--- 【修改點 1】：新增收集廣告總預算 (檢核人部分)
+	    actualTotalBudget: form.elements.actualTotalBudget.value || '', // <--- 【修改點 1】：新增收集廣告總預算 (檢核人部分)
             actualSet: form.elements.actualSet.value || '',
             actualStartDate: form.elements.actualStartDate.value || '',
             actualEndDate: form.elements.actualEndDate.value || '',
@@ -1024,7 +1024,7 @@ async function saveChecklist(event) {
             // 核心簽核欄位 (必須提交)
             reviewer: currentUser.displayName,
             reviewerId: userId,
-			reviewerEmail: userEmail, // <--- 【修改點 3】：新增儲存檢核人 Email
+	    reviewerEmail: userEmail, // <--- 【修改點 3】：新增儲存檢核人 Email
             result: formData.result,
             reviewTimestamp: serverTimestamp(), 
         };
@@ -1240,7 +1240,7 @@ window.showDetailModal = function(id) {
             <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 <div><span class="font-semibold">執行人:</span> ${item.executor} (${item.creatorEmail || 'N/A'})</div>
                 <div><span class="font-semibold">執行時間:</span> ${item.executionTimestampDisplay || 'N/A'}</div>
-                                <div><span class="font-semibold">檢核人:</span> ${item.reviewer || 'N/A'} (${item.reviewerEmail || 'N/A'})</div>
+                <div><span class="font-semibold">檢核人:</span> ${item.reviewer || 'N/A'} (${item.reviewerEmail || 'N/A'})</div>
                 <div><span class="font-semibold">檢核時間:</span> ${item.reviewTimestampDisplay || 'N/A'}</div>
             </div>
 
@@ -1443,7 +1443,7 @@ filteredData.forEach(item => {
 			<td class="text-sm">${item.executionTimestampDisplay}</td>
 			<td class="font-medium text-gray-700">${item.clientName}</td>
 			<td>${item.executor} (${item.creatorEmail || 'N/A'})</td>
-			<td>${item.reviewer || 'N/A'}</td>
+			<td>${item.reviewer || 'N/A'} (${item.reviewerEmail || 'N/A'})</td>
 			<td><span class="inline-block px-3 py-1 text-xs font-semibold rounded-full ${statusClass}">${resultText}</span></td>
 			<td>${actionButton}</td>
 			<td><button onclick="showDetailModal('${item.id}')" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">查看</button></td>
@@ -1770,7 +1770,7 @@ async function openAdminPanel() {
                     item.actualOriginalAccountBudget, 
                     item.targetAccountBudgetAfterTopUp, 
                     item.actualAccountBudgetAfterTopUp, 
-					item.targetTotalBudget,
+		    item.targetTotalBudget,
                     item.adBudgetType, 
                     item.targetAmount, 
                     item.actualSet, 
@@ -1778,7 +1778,7 @@ async function openAdminPanel() {
                     item.targetEndDate || '',   
                     item.actualStartDate || '', 
                     item.actualEndDate || '',
-					item.insertionOrderNumber,
+		    item.insertionOrderNumber,
                     item.executor, 
                     item.reviewer, 
                     item.result, 
@@ -1815,8 +1815,3 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
-
-
-
-
-
