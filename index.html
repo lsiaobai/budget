@@ -983,13 +983,13 @@ function collectFormData() {
             // 【新增這行】讓 saveChecklist 可以讀取使用者手動輸入的檢核人名稱
             reviewer: form.elements.reviewer.value || '', 
             // 收集檢核人備註和結果
-	    reviewerEmail: userEmail,
+	   	    reviewerEmail: userEmail,
             reviewNotes: form.elements.reviewNotes.value || '',
             result: form.elements.result.value || 'pass',
             // 收集 actual... 欄位（如果在檢核模式下允許修改）
             actualOriginalAccountBudget: form.elements.actualOriginalAccountBudget.value || '',
             actualAccountBudgetAfterTopUp: form.elements.actualAccountBudgetAfterTopUp.value || '',
-	    actualTotalBudget: form.elements.actualTotalBudget.value || '', // <--- 【修改點 1】：新增收集廣告總預算 (檢核人部分)
+	        actualTotalBudget: form.elements.actualTotalBudget.value || '', // <--- 【修改點 1】：新增收集廣告總預算 (檢核人部分)
             actualSet: form.elements.actualSet.value || '',
             actualStartDate: form.elements.actualStartDate.value || '',
             actualEndDate: form.elements.actualEndDate.value || '',
@@ -1023,7 +1023,7 @@ async function saveChecklist(event) {
         updateData = {
             // 核心簽核欄位 (必須提交)
             reviewer: currentUser.displayName,
-            reviewerId: userId,
+           // reviewerId: userId,
 	       // reviewerEmail: currentUser.Email, // <--- 【修改點 3】：新增儲存檢核人 Email
             result: formData.result,
             reviewTimestamp: serverTimestamp(), 
@@ -1820,6 +1820,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
