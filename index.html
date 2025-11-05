@@ -1747,8 +1747,8 @@ async function openAdminPanel() {
             const headers = [
                 "客戶名稱", "建立/修改日期", "廣告平台", "檢核類型", "帳號名稱/帳號ID", // 新欄位
                 "原帳戶執行設定預算", "原帳戶檢核設定預算", "加值後執行設定預算", "加值後檢核設定預算", 
-                "廣告預算類型", "廣告活動執行設定金額", "廣告活動檢核設定金額", 
-                "執行設定開始日期", "執行設定結束日期", "檢核設定開始日期", "檢核設定結束日期", 
+                "廣告總預算", "廣告預算類型", "廣告活動執行設定金額", "廣告活動檢核設定金額", 
+                "執行設定開始日期", "執行設定結束日期", "檢核設定開始日期", "檢核設定結束日期", "委刊號", 
                 "執行人", "核對人", "核對結果", "備註", 
                 "最後執行時間", "最後檢核時間", // 新增時間戳記
                 "建立者User ID", "建立者Email" // 新增創建者資訊
@@ -1770,13 +1770,15 @@ async function openAdminPanel() {
                     item.actualOriginalAccountBudget, 
                     item.targetAccountBudgetAfterTopUp, 
                     item.actualAccountBudgetAfterTopUp, 
+					item.targetTotalBudget,
                     item.adBudgetType, 
                     item.targetAmount, 
                     item.actualSet, 
                     item.targetStartDate || '', 
                     item.targetEndDate || '',   
                     item.actualStartDate || '', 
-                    item.actualEndDate || '',   
+                    item.actualEndDate || '',
+					item.insertionOrderNumber
                     item.executor, 
                     item.reviewer, 
                     item.result, 
@@ -1813,6 +1815,7 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
 
