@@ -116,104 +116,86 @@
                 </div>
             </div>
 
+
             <!-- 預算核對表格 -->
-<div class="p-6 sm:p-8 overflow-x-auto">
-    <h2 class="text-xl font-bold text-gray-800 mb-4" id="formTitle">廣告活動與預算細節</h2>
-    
-    <table class="checklist-table w-full border-collapse rounded-xl overflow-hidden">
-        <thead>
-            <tr>
-                <th class="w-1/4">欄位類別 (Category)</th>
-                <th class="w-1/4">設定內容 (Configuration)</th>
-                <th class="w-1/4">執行設定 (Executor Setting)</th> <th class="w-1/4">檢核設定 (Reviewer Setting)</th> </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td class="font-medium text-gray-700 is-required">客戶名稱/活動名稱</td>
-                <td>
-                    <input type="text" name="clientName" placeholder="輸入客戶名稱或活動名稱" class="w-full p-0.5 border-none bg-transparent focus:ring-0" required>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-            </tr>
-            <tr>
-                <td class="font-medium text-gray-700 is-required">日期 (Date)</td>
-                <td>
-                    <input type="date" name="date" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" required>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-            </tr>
+            <div class="p-6 sm:p-8 overflow-x-auto">
+                <h2 class="text-xl font-bold text-gray-800 mb-4" id="formTitle">廣告活動與預算細節</h2>
+                
+                <table class="checklist-table w-full border-collapse rounded-xl overflow-hidden">
+                    <thead>
+                        <tr>
+                            <th class="w-1/4">欄位類別 (Category)</th>
+                            <th class="w-1/4">設定內容 (Configuration)</th>
+                            <th class="w-1/4">執行設定 (Executor Setting)</th> <!-- Executor only fill -->
+                            <th class="w-1/4">檢核設定 (Reviewer Setting)</th> <!-- Reviewer only fill -->
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 廣告平台 -->
+                        <tr>
+                            <td class="font-medium text-gray-700">廣告平台</td>
+                            <td>
+                                <select name="platform" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
+                                    <option>Meta Ads (Facebook/IG)</option>
+                                    <option>Google Ads</option>
+                                    <option>Line Ads</option>
+                                    <option>TikTok Ads</option>
+                                    <option>其他</option>
+                                </select>
+                            </td>
+                            <td colspan="2" class="text-gray-500 text-sm">N/A</td>
+                        </tr>
+                        <!-- 帳號名稱/帳號ID (New Field Name) -->
+                        <tr>
+                            <td class="font-medium text-gray-700 is-required">帳號名稱/帳號ID</td>
+                            <td>
+                                <input type="text" name="accountNameId" placeholder="輸入帳號名稱/ID" class="w-full p-0.5 border-none bg-transparent focus:ring-0" required>
+                            </td>
+                            <td colspan="2" class="text-gray-500 text-sm">N/A</td>
+                        </tr>
+                        <!-- 檢核類型 (Control Field) -->
+                        <tr>
+                            <td class="font-medium text-gray-700 is-required">檢核類型</td>
+                            <td>
+                                <select name="verificationType" id="verificationType" class="w-full p-0.5 border-none bg-transparent focus:ring-0" required>
+                                    <option value="account_budget">帳戶預算 (Account Budget)</option>
+                                    <option value="ad_budget">廣告預算 (Ad Budget)</option>
+                                    <option value="all">全部 (All)</option>
+                                </select>
+                            </td>
+                            <td colspan="2" class="text-gray-500 text-sm">N/A</td>
+                        </tr>
+                        
+                        <!-- 預算相關欄位 (Account Budget) -->
+                        <tr id="row-targetOriginalAccountBudget">
+                            <td class="font-medium text-gray-700">原帳戶預算</td>
+                            <td>
+                                <label class="block text-xs font-semibold mb-1">預算變動前的值</label>
+                            </td>
+                            <td class="input-group executor-field">
+                                <input type="number" name="targetOriginalAccountBudget" placeholder="執行金額" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
+                            </td>
+                            <td class="input-group reviewer-field">
+                                <input type="number" name="actualOriginalAccountBudget" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
+                            </td>
+                        </tr>
+                        <tr id="row-targetAccountBudgetAfterTopUp">
+                            <td class="font-medium text-gray-700">加值後帳戶預算</td>
+                            <td>
+                                <label class="block text-xs font-semibold mb-1">預算變動後的值</label>
+                            </td>
+                            <td class="input-group executor-field">
+                                <input type="number" name="targetAccountBudgetAfterTopUp" placeholder="執行金額" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
+                            </td>
+                            <td class="input-group reviewer-field">
+                                <input type="number" name="actualAccountBudgetAfterTopUp" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
+                            </td>
+                        </tr>
 
-            <tr id="row-insertionOrderNumber">
-                <td class="font-medium text-gray-700">委刊號</td>
-                <td>
-                    <label class="block text-xs font-semibold mb-1">若有委刊號請填寫</label>
-                </td>
-                <td class="input-group executor-field" colspan="2">
-                    <input type="text" name="insertionOrderNumber" placeholder="執行人填寫" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                </td>
-            </tr>
-
-            <tr>
-                <td class="font-medium text-gray-700">廣告平台</td>
-                <td>
-                    <select name="platform" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                        <option>Meta Ads (Facebook/IG)</option>
-                        <option>Google Ads</option>
-                        <option>Line Ads</option>
-                        <option>TikTok Ads</option>
-                        <option>其他</option>
-                    </select>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-            </tr>
-            <tr>
-                <td class="font-medium text-gray-700 is-required">帳號名稱/帳號ID</td>
-                <td>
-                    <input type="text" name="accountNameId" placeholder="輸入帳號名稱/ID" class="w-full p-0.5 border-none bg-transparent focus:ring-0" required>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-            </tr>
-            <tr>
-                <td class="font-medium text-gray-700 is-required">檢核類型</td>
-                <td>
-                    <select name="verificationType" id="verificationType" class="w-full p-0.5 border-none bg-transparent focus:ring-0" required>
-                        <option value="account_budget">帳戶預算 (Account Budget)</option>
-                        <option value="ad_budget">廣告預算 (Ad Budget)</option>
-                        <option value="all">全部 (All)</option>
-                    </select>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-            </tr>
-            
-            <tr id="row-targetOriginalAccountBudget">
-                <td class="font-medium text-gray-700">原帳戶預算</td>
-                <td>
-                    <label class="block text-xs font-semibold mb-1">預算變動前的值</label>
-                </td>
-                <td class="input-group executor-field">
-                    <input type="number" name="targetOriginalAccountBudget" placeholder="執行金額" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                </td>
-                <td class="input-group reviewer-field">
-                    <input type="number" name="actualOriginalAccountBudget" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                </td>
-            </tr>
-            <tr id="row-targetAccountBudgetAfterTopUp">
-                <td class="font-medium text-gray-700">加值後帳戶預算</td>
-                <td>
-                    <label class="block text-xs font-semibold mb-1">預算變動後的值</label>
-                </td>
-                <td class="input-group executor-field">
-                    <input type="number" name="targetAccountBudgetAfterTopUp" placeholder="執行金額" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                </td>
-                <td class="input-group reviewer-field">
-                    <input type="number" name="actualAccountBudgetAfterTopUp" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                </td>
-            </tr>
-
-            <tr id="row-totalBudget">
-                <td class="font-medium text-gray-700 is-required">廣告總預算</td>
-                <td>
-                    <label class="block text-xs font-semibold mb-1">合約總額或活動預算總額</label>
+        		    <tr id="row-totalBudget">
+          		      <td class="font-medium text-gray-700 is-required">廣告總預算</td>
+             		   <td>
+              		      <label class="block text-xs font-semibold mb-1">合約總額或活動預算總額</label>
                     <span class="text-gray-400 text-xs">（請填寫必填欄位）</span>
                 </td>
                 <td class="input-group executor-field">
@@ -223,110 +205,78 @@
                     <input type="number" name="actualTotalBudget" placeholder="檢核實際值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-green-600 font-semibold">
                 </td>
             </tr>
-            
-            <tr id="row-adBudgetType">
-                <td class="font-medium text-gray-700">廣告預算類型</td>
-                <td class="input-group executor-field">
-                    <select name="adBudgetType" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
-                        <option value="">-- 請選擇 --</option>
-                        <option>日預算 (Daily Budget)</option>
-                        <option>總預算 (Lifetime Budget)</option>
-                    </select>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">（選擇類型後請填寫）</td>
-            </tr>
-            
-            <tr id="row-targetAmount" class="bg-yellow-50/50">
-                <td class="font-bold text-indigo-700">廣告活動日預算金額 (Budget)</td>
+
+                        
+                        <!-- 廣告活動預算類型 (Ad Budget) -->
+                        <tr id="row-adBudgetType">
+                            <td class="font-medium text-gray-700">廣告預算類型</td>
+                            <td class="input-group executor-field">
+                                <select name="adBudgetType" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
+                                    <option value="">-- 請選擇 --</option>
+                                    <option>日預算 (Daily Budget)</option>
+                                    <option>總預算 (Lifetime Budget)</option>
+                                </select>
+                            </td>
+                            <td colspan="2" class="text-gray-500 text-sm">（選擇類型後請填寫）</td>
+                        </tr>
+                        
+                        <!-- 預算金額核對 (Ad Budget) -->
+                        <tr id="row-targetAmount" class="bg-yellow-50/50">
+                            <td class="font-bold text-indigo-700">廣告活動日預算金額 (Budget)</td>
+                            <td>
+                                <label class="block text-xs font-semibold mb-1">最終設定的金額</label>
+                                <span class="text-gray-400 text-xs">（以當地貨幣計價）</span>
+                            </td>
+                            <td class="input-group executor-field">
+                                <input type="number" name="targetAmount" placeholder="執行數值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-red-600 font-semibold">
+                            </td>
+                            <td class="input-group reviewer-field">
+                                <input type="number" name="actualSet" placeholder="檢核設定值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-green-600 font-semibold">
+                            </td>
+                        </tr>
+                        
+                        <!-- 投放期間 - 開始日期 (Ad Budget) -->
+                        <tr id="row-targetStartDate1">
+                            <td class="font-medium text-gray-700" rowspan="2">投放期間 (Duration)</td>
+                            <td>
+                                <label class="block text-xs font-semibold mb-1">開始日期 (Start Date)</label>
+                            </td>
+                            <td class="input-group executor-field">
+                                <label class="block text-xs text-gray-500 mb-1">執行設定 (Target)</label>
+                                <input type="date" name="targetStartDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                            </td>
+                            <td class="input-group reviewer-field">
+                                <label class="block text-xs text-gray-500 mb-1">檢核設定 (Actual)</label>
+                                <input type="date" name="actualStartDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                            </td>
+                        </tr>
+                        <!-- 投放期間 - 結束日期 (Ad Budget) -->
+                        <tr id="row-targetEndDate2">
+                            <td>
+                                <label class="block text-xs font-semibold mb-1">結束日期 (End Date)</label>
+                            </td>
+                            <td class="input-group executor-field">
+                                <label class="block text-xs text-gray-500 mb-1">執行設定 (Target)</label>
+                                <input type="date" name="targetEndDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                            </td>
+                            <td class="input-group reviewer-field">
+                                <label class="block text-xs text-gray-500 mb-1">檢核設定 (Actual)</label>
+                                <input type="date" name="actualEndDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                            </td>
+                        </tr>
+
+       		     <tr id="row-insertionOrderNumber">
+                <td class="font-medium text-gray-700">委刊號</td>
                 <td>
-                    <label class="block text-xs font-semibold mb-1">最終設定的金額</label>
-                    <span class="text-gray-400 text-xs">（以當地貨幣計價）</span>
-                </td>
-                <td class="input-group executor-field">
-                    <input type="number" name="targetAmount" placeholder="執行數值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-red-600 font-semibold">
-                </td>
-                <td class="input-group reviewer-field">
-                    <input type="number" name="actualSet" placeholder="檢核設定值" class="w-full p-0.5 border-none bg-transparent focus:ring-0 text-green-600 font-semibold">
-                </td>
-            </tr>
-            
-            <tr id="row-targetStartDate1">
-                <td class="font-medium text-gray-700" rowspan="2">投放期間 (Duration)</td>
-                <td>
-                    <label class="block text-xs font-semibold mb-1">開始日期 (Start Date)</label>
-                </td>
-                <td class="input-group executor-field">
-                    <label class="block text-xs text-gray-500 mb-1">執行設定 (Target)</label>
-                    <input type="date" name="targetStartDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                </td>
-                <td class="input-group reviewer-field">
-                    <label class="block text-xs text-gray-500 mb-1">檢核設定 (Actual)</label>
-                    <input type="date" name="actualStartDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                </td>
-            </tr>
-            <tr id="row-targetEndDate2">
-                <td>
-                    <label class="block text-xs font-semibold mb-1">結束日期 (End Date)</label>
-                </td>
-                <td class="input-group executor-field">
-                    <label class="block text-xs text-gray-500 mb-1">執行設定 (Target)</label>
-                    <input type="date" name="targetEndDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                </td>
-                <td class="input-group reviewer-field">
-                    <label class="block text-xs text-gray-500 mb-1">檢核設定 (Actual)</label>
-                    <input type="date" name="actualEndDate" class="w-full p-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                </td>
-            </tr>
-            
-            <tr>
-                <td class="font-medium text-gray-700" rowspan="2">備註/註記</td>
-                <td class="p-0.5">
-                    <label class="block text-xs font-semibold mb-1">執行人備註 (Notes)</label>
+                    <label class="block text-xs font-semibold mb-1">若有委刊號請填寫</label>
                 </td>
                 <td class="input-group executor-field" colspan="2">
-                    <textarea name="notes" placeholder="輸入任何與執行相關的補充說明..." rows="3" class="w-full p-1 border-none bg-transparent focus:ring-0 text-sm"></textarea>
+                    <input type="text" name="insertionOrderNumber" placeholder="執行人填寫" class="w-full p-0.5 border-none bg-transparent focus:ring-0">
                 </td>
             </tr>
-            <tr>
-                <td class="p-0.5">
-                    <label class="block text-xs font-semibold mb-1 text-green-700">檢核人註記 (Review Notes)</label>
-                </td>
-                <td class="input-group reviewer-field" colspan="2">
-                    <textarea name="reviewNotes" placeholder="輸入任何檢核相關的註記..." rows="3" class="w-full p-1 border-none bg-transparent focus:ring-0 text-sm"></textarea>
-                </td>
-            </tr>
-            
-            <tr>
-                <td class="font-medium text-gray-700">執行人 (Executor)</td>
-                <td class="text-sm">
-                    <div id="executorDisplay" class="font-semibold text-red-600"></div>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-            </tr>
-            <tr>
-                <td class="font-medium text-gray-700">最後執行時間</td>
-                <td class="text-sm">
-                    <div id="executionTimestampDisplay" class="font-semibold text-gray-600"></div>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-            </tr>
-            <tr>
-                <td class="font-medium text-gray-700">檢核人 (Reviewer)</td>
-                <td class="text-sm">
-                    <div id="reviewerDisplay" class="font-semibold text-green-600"></div>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-            </tr>
-            <tr>
-                <td class="font-medium text-gray-700">檢核時間</td>
-                <td class="text-sm">
-                    <div id="reviewTimestampDisplay" class="font-semibold text-gray-600"></div>
-                </td>
-                <td colspan="2" class="text-gray-500 text-sm">N/A</td>
-            </tr>
-            </tbody>
-    </table>
-</div>
+
+                    </tbody>
+                </table>
                 
                 <!-- Budget Calculation Section -->
                 <div class="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
@@ -1863,5 +1813,6 @@ async function openAdminPanel() {
     </script>
 </body>
 </html>
+
 
 
